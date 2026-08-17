@@ -23,3 +23,13 @@ export async function fetchCustomers(): Promise<Customer[]> {
 
   return response.json()
 }
+
+export async function fetchCustomer(id: number): Promise<Customer> {
+  const response = await fetch(`/api/customers/${id}`)
+
+  if (!response.ok) {
+    throw new Error(`The API returned ${response.status}`)
+  }
+
+  return response.json()
+}

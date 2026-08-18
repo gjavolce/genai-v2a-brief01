@@ -6,7 +6,9 @@ it, one feature at a time.
 
 ## First five minutes
 
-1. **Code → Codespaces → Create codespace on main.** Wait for it to build.
+1. **Code → Codespaces → Create codespace on main.** The editor opens before
+   setup has finished — dependencies are still downloading in the background.
+   Wait for `✅ Codespace ready` in the setup terminal before step 2.
 2. In the terminal: `./verify.sh` — everything should be green.
 3. Start the app — **two terminals, both left running**:
 

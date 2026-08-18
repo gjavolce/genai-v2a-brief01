@@ -5,12 +5,25 @@
   "service": "app",
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
 
-  // NO "features" block on purpose.
-  // The universal image already ships Java 21, Maven, Node 20 and gh.
-  // Every devcontainer feature is a script that runs at build time and can
-  // fail — which is exactly what happened with the node feature on
-  // ubuntu-24.04. Zero features means zero feature failures, and universal
-  // is the image Codespaces caches by default, so builds are fast.
+  // The base image is Java 21 + Maven only, so Node and gh come from
+  // features. This reverses the original "zero features" stance, which was
+  // premised on universal being cached by Codespaces — the creation log
+  // showed it is not (412s of a 474s create, pulled from scratch, zero
+  // "Already exists" lines). Two small features on bookworm are a far
+  // cheaper risk than 35 layers of extraction on every single create.
+  //
+  // The historical failure was the node feature on ubuntu-24.04; bookworm
+  // is the supported, well-trodden target for both of these.
+  // sshd is required, not optional: universal shipped an SSH server and this
+  // image does not, which breaks `gh codespace ssh`, `gh codespace logs` and
+  // `gh codespace cp` outright — the instructor's only CLI route into a
+  // participant's codespace. Learners in the browser are unaffected either
+  // way, so this is purely to restore tooling access.
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": { "version": "20" },
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/sshd:1": {}
+  },
 
   "hostRequirements": {
     "cpus": 4,
@@ -20,13 +33,31 @@
 
   "customizations": {
     "vscode": {
+      // Four extensions, each one load-bearing. Deliberately NOT the
+      // vscjava.vscode-java-pack meta-pack: it drags in Gradle for Java (this
+      // project is pure Maven, and it starts a daemon JVM), IntelliCode
+      // (redundant next to Copilot, and fights it for the completion widget),
+      // Project Manager for Java and Maven for Java (side panels only —
+      // project import is done by the language server's built-in m2e).
+      // GitHub.copilot-chat is NOT listed: it is built into the VS Code
+      // server at a newer version, and listing it produces a hard install
+      // error ("cannot be downgraded to version 0.48.1") in the boot log.
       "extensions": [
         "GitHub.copilot",
-        "vscjava.vscode-java-pack",
-        "bierner.markdown-mermaid"
+        "redhat.java",
+        "vscjava.vscode-java-debug",
+        "vscjava.vscode-java-test"
       ],
       "settings": {
         "java.configuration.updateBuildConfiguration": "automatic",
+
+        // No JDK pin. This image ships exactly one JDK (unlike universal,
+        // which carried several under SDKMAN and could import the project
+        // under the wrong one), so detection has nothing to get wrong and a
+        // hardcoded path could only be a liability.
+        // No build.gradle exists. Don't let the server go looking.
+        "java.import.gradle.enabled": false,
+
         "editor.fontSize": 15,
         "terminal.integrated.fontSize": 14,
         "workbench.startupEditor": "readme",
@@ -45,7 +76,14 @@
     "5173": { "label": "Web", "onAutoForward": "openPreview" }
   },
 
+  // The editor unblocks after onCreateCommand, which is near-instant.
+  // Dependency warm-up then runs in post-create.sh while the participant is
+  // already reading the README and opening Chat, instead of watching a
+  // progress bar. The trade: a terminal is reachable before npm ci finishes,
+  // so both scripts are explicit about waiting for "Codespace ready".
+  "waitFor": "onCreateCommand",
+  "onCreateCommand": "bash .devcontainer/on-create.sh",
   "postCreateCommand": "bash .devcontainer/post-create.sh",
 
-  "remoteUser": "codespace"
+  "remoteUser": "vscode"
 }

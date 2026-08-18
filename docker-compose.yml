@@ -1,0 +1,59 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    # Binary logging and performance_schema are overhead a workshop database
+    # never uses — both cost start-up time and memory.
+    command:
+      - "--skip-log-bin"
+      - "--performance-schema=OFF"
+      - "--innodb-buffer-pool-size=128M"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: capstone
+      MYSQL_USER: capstone
+      MYSQL_PASSWORD: capstone
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-ucapstone", "-pcapstone"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  backend:
+    build: ./api
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/capstone?useSSL=false&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: capstone
+      SPRING_DATASOURCE_PASSWORD: capstone
+      DB_HOST: mysql
+      DB_PORT: "3306"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./api:/app
+      - maven-repo:/root/.m2
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build: ./web
+    environment:
+      VITE_API_PROXY_TARGET: http://backend:8080
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./web:/app
+      - web-node-modules:/app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  mysql-data:
+  maven-repo:
+  web-node-modules:

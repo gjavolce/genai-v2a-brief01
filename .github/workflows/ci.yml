@@ -10,35 +10,17 @@ jobs:
   verify:
     runs-on: ubuntu-latest
 
-    services:
-      db:
-        image: mysql:8.4
-        env:
-          MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: capstone
-          MYSQL_USER: capstone
-          MYSQL_PASSWORD: capstone
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -ucapstone -pcapstone"
-          --health-interval=5s
-          --health-timeout=5s
-          --health-retries=30
-
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-          cache-dependency-path: api/pom.xml
-
       # The same script participants run. If it passes here it passes for them.
       - name: Run verify.sh
-        env:
-          DB_HOST: 127.0.0.1
-          DB_PORT: '3306'
         run: ./verify.sh
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

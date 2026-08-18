@@ -22,7 +22,6 @@
     "vscode": {
       "extensions": [
         "GitHub.copilot",
-        "GitHub.copilot-chat",
         "vscjava.vscode-java-pack",
         "bierner.markdown-mermaid"
       ],

@@ -8,8 +8,16 @@ it, one feature at a time.
 
 1. **Code → Codespaces → Create codespace on main.** Wait for it to build.
 2. In the terminal: `./verify.sh` — everything should be green.
-3. Start the app and open the forwarded port. You should see a list of customers,
-   served from a real database. That's your baseline.
+3. Start the app — **two terminals, both left running**:
+
+   ```bash
+   cd api && ./mvnw spring-boot:run     # API → port 8080
+   cd web && npm run dev                # Web → port 5173
+   ```
+
+   Wait for `Started CapstoneApplication`, then open the forwarded port **5173**
+   from the **Ports** panel. You should see a list of customers, served from a
+   real database. That's your baseline.
 4. Open the Chat view. Check the **agent picker shows 4 agents**, and typing `/`
    shows **2 commands**. Two more appear after Task 00.
 5. Open `docs/TASKS.md`.
@@ -185,6 +193,7 @@ list. The fifth, `security-reviewer`, you'll write yourself.
 | Agent picker is empty | Files must be `.github/agents/<name>.agent.md`, `name:` matching the filename. Reload Window. |
 | A skill isn't in the `/` picker | `name:` in `SKILL.md` must match its directory name **exactly**. Reload Window. |
 | `verify.sh` red | Read the one line naming the failing step. Don't retry the same command hoping. |
+| Page loads, but `Could not load customers: The API returned 500` | The web app is running and the API isn't. Start it: `cd api && ./mvnw spring-boot:run` |
 | MySQL unreachable | It's a devcontainer service. Rebuild the container; don't run docker commands yourself. |
 | An agent edited something it shouldn't | Check its `tools:` list, then revert the checkpoint. Being wrong is cheap; not looking is expensive. |
 | `/architect` refuses to run | You skipped `/business-analyst`. That's deliberate. |

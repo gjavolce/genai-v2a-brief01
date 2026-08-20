@@ -29,4 +29,4 @@ Current"), an account number, a currency, and a balance.
 
 Deliberately small. Its job is to teach you the loop, not the domain. If it feels
 trivial, that's correct — do it properly anyway, because the shape you establish
-here is the shape every later feature copies, and so does Copilot.
+here is the shape every later feature copies, and so does Claude.

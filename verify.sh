@@ -20,12 +20,16 @@ echo "────────────────────────�
 step "Docker"
 if docker info >/dev/null 2>&1; then ok; else bad "Docker is not running"; fi
 
-step "Copilot instructions"
-if [ -f "$ROOT/.github/copilot-instructions.md" ]; then ok; else bad "missing .github/copilot-instructions.md"; fi
+step "CLAUDE.md"
+if [ -f "$ROOT/CLAUDE.md" ]; then ok; else bad "missing CLAUDE.md"; fi
 
-step "Agents"
-n=$(ls -1 "$ROOT"/.github/agents/*.agent.md 2>/dev/null | wc -l | tr -d ' ')
-if [ "${n:-0}" -ge 4 ]; then ok; else bad "expected 4 in .github/agents, found ${n:-0}"; fi
+step "Subagents"
+n=$(ls -1 "$ROOT"/.claude/agents/*.md 2>/dev/null | wc -l | tr -d ' ')
+if [ "${n:-0}" -ge 4 ]; then ok; else bad "expected 4 in .claude/agents, found ${n:-0}"; fi
+
+step "Commands"
+n=$(ls -1 "$ROOT"/.claude/commands/*.md 2>/dev/null | wc -l | tr -d ' ')
+if [ "${n:-0}" -ge 3 ]; then ok; else bad "expected 3 in .claude/commands, found ${n:-0}"; fi
 
 if [ "$fail" != "0" ]; then
   echo "────────────────────────────────────────────"
@@ -85,8 +89,8 @@ if [ "$fail" = "0" ]; then
   echo "✅ All green."
   echo ""
   echo "   Now the part the shell cannot check for you:"
-  echo "   1. Open Chat → agent picker → expect 4 agents"
-  echo "   2. Type / in Chat        → expect 2 slash commands"
+  echo "   1. Run /agents  → expect 4 subagents"
+  echo "   2. Type /       → expect 3 commands"
   echo ""
 else
   echo "❌ Fix the above before continuing."

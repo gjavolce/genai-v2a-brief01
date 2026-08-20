@@ -1,17 +1,18 @@
 ---
-mode: agent
 description: Close out a finished feature — PR description, progress, commit
+argument-hint: <task-number, e.g. 01>
+allowed-tools: Read, Write, Edit, Grep, Glob, Bash
 ---
 
 # Task
 
-Task ${input:task:Which task? e.g. 01} has passed the review chain. Close it out.
+Task $1 has passed the review chain. Close it out.
 
 # Stop first if any of these are untrue
 
 - `./verify.sh` is green
 - `code-reviewer` and `security-reviewer` both report zero HIGH findings
-- the working branch is `feature/${input:task}-*`, not `main`
+- the working branch is `feature/$1-*`, not `main`
 - the diff touches the database, the backend **and** the frontend
 
 If any fails, say which and stop. Closing out a red feature is how a broken
@@ -19,16 +20,17 @@ build reaches the next person — and on `main`, how it reaches everyone.
 
 # Constraints
 
-- The PR description comes from `plan.md`, which already holds the why and the
-  what. Do not reconstruct it from the diff; the plan is the better source.
+- The PR description comes from `docs/features/$1/$1-plan.md`, which already
+  holds the why and the what. Do not reconstruct it from the diff; the plan is
+  the better source.
 - Do not modify anything under `src/main`. This step is documentation only.
 
 # Expected output
 
-**1. `docs/features/${input:task}/PR.md`**
+**1. `docs/features/$1/$1-PR.md`**
 
 ```markdown
-## Task ${input:task} — <title>
+## Task $1 — <title>
 
 ### What
 One paragraph. The capability, not the implementation.
@@ -53,10 +55,10 @@ and useful entry.
 What was deliberately left out, and why. Anything noticed but not fixed.
 ```
 
-**2. Update `docs/features/${input:task}/acceptance.md`** — tick each criterion
-that now has a passing test. If any criterion changed during implementation,
-record the change and the reason. Criteria drift is normal; undocumented drift
-is not.
+**2. Update `docs/features/$1/$1-acceptance.md`** — tick each criterion that now
+has a passing test, by its id, naming the test. If any criterion changed during
+implementation, record the change and the reason. Criteria drift is normal;
+undocumented drift is not.
 
 **3. Suggest the git commands** — a conventional-commit message with the task
 number in the subject, then the push and PR commands for this branch. Do not run

@@ -1,12 +1,12 @@
 <!--
-  TASK 00, PART A · copy to .github/skills/business-analyst/SKILL.md and complete.
+  TASK 00, PART A · copy to .claude/skills/business-analyst/SKILL.md and complete.
   Fill every << ... >>. Delete these comments.
-  The files in .github/prompts/ are good examples of tone — read one first.
+  The files in .claude/commands/ are good examples of tone — read one first.
 -->
 ---
 name: business-analyst
 
-# This is how Copilot decides when to reach for the skill, and what you read in
+# This is how Claude decides when to reach for the skill, and what you read in
 # the picker at 3pm having forgotten what you built. Say what it does and when.
 description: << ... >>
 
@@ -24,7 +24,7 @@ argument-hint: task number, e.g. 01
 
 ## What you produce
 
-`docs/features/${input:task}/acceptance.md`, containing:
+`docs/features/NN/NN-acceptance.md`, containing:
 
 ### Functional requirements
 
@@ -39,6 +39,12 @@ argument-hint: task number, e.g. 01
 
 << For each FR, the concrete cases that prove it. Decide the format — plain
    statements, or Given/When/Then.
+
+   Give each criterion an id, and say how ids are formed. A plain numbered list
+   restarts at 1 under every FR; spec-guardian, test-verifier and
+   /feature-close then each invent their own numbering and none of them agree.
+   Tie the id to the FR it proves — AC-NN-1.1 under FR-NN-1 — so a criterion
+   can be traced back.
 
    The important instruction: demand the unhappy paths. What is refused, what
    is rejected, what someone is not allowed to do. A feature with only
@@ -73,7 +79,7 @@ argument-hint: task number, e.g. 01
 <!--
   DONE WHEN
   ✅ /business-analyst is in the slash picker
-  ✅ /business-analyst 01 writes docs/features/01/acceptance.md
+  ✅ /business-analyst 01 writes docs/features/01/01-acceptance.md
   ✅ every FR is testable — you can name the test
   ✅ unhappy paths are covered, not just happy ones
   ✅ the four questions are answered, not skipped

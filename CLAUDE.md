@@ -1,4 +1,8 @@
-# Project conventions
+# PayFlow — project conventions
+
+Binding for every agent and command in this repo. Where this file and an ADR
+under `docs/features/*/*-adr.md` disagree, the ADR wins — it is the more
+specific decision.
 
 ## Stack
 

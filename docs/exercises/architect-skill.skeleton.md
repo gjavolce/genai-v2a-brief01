@@ -1,12 +1,12 @@
 <!--
-  TASK 00, PART B · copy to .github/skills/architect/SKILL.md and complete.
+  TASK 00, PART B · copy to .claude/skills/architect/SKILL.md and complete.
   Fill every << ... >>. Delete these comments.
   You've just built business-analyst — this is the same shape. Reuse what worked.
 -->
 ---
 name: architect
 
-# How Copilot decides when to reach for this, and what you read in the picker
+# How Claude decides when to reach for this, and what you read in the picker
 # later. Say what it does and when — including that it runs AFTER the analyst.
 description: << ... >>
 
@@ -20,14 +20,15 @@ argument-hint: task number, e.g. 01
 
 ## What you read
 
-<< In order: docs/brief.md · docs/tasks/NN-*.md · docs/features/NN/acceptance.md
+<< In order: docs/brief.md · docs/tasks/NN-*.md ·
+   docs/features/NN/NN-acceptance.md
    (the analyst's output — this is your input, do not proceed without it) ·
-   every existing docs/features/*/adr.md, so you know what has already been
+   every existing docs/features/*/*-adr.md, so you know what has already been
    decided. >>
 
 ## What you produce
 
-`docs/features/${input:task}/adr.md`, containing:
+`docs/features/NN/NN-adr.md`, containing:
 
 ### The decision(s)
 
@@ -74,7 +75,7 @@ argument-hint: task number, e.g. 01
 <!--
   DONE WHEN
   ✅ /architect is in the slash picker
-  ✅ /architect 01 writes docs/features/01/adr.md
+  ✅ /architect 01 writes docs/features/01/01-adr.md
   ✅ it reads acceptance.md first and refuses to run without it
   ✅ two real options, not one and a straw man
   ✅ consequences include a genuine downside

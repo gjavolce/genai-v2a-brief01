@@ -3,8 +3,8 @@ package com.neueda.capstone.account;
 import java.math.BigDecimal;
 import java.util.List;
 
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -37,17 +37,24 @@ class AccountDatabaseIntegrationTest {
     @Autowired
     private AccountRepository accountRepository;
 
-        @Autowired
-        private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
-        @BeforeEach
-        void resetFixtureOwnership() {
-            jdbcTemplate.update("UPDATE account SET customer_id = 1 WHERE account_number = ?",
-                    "GB00MERIDIAN00000001");
-        }
+    @BeforeEach
+    void resetFixture() {
+        jdbcTemplate.update(
+                "UPDATE account SET customer_id = 1, balance = ? WHERE account_number = ?",
+                new BigDecimal("1234.50000000"),
+                "GB00MERIDIAN00000001");
+    }
 
     @Test
-    void shouldRunFlywayAndPreserveSeededBalancePrecision() {
+    void shouldRunFlywayAndPreserveBalancePrecision() {
+        jdbcTemplate.update(
+                "UPDATE account SET balance = ? WHERE account_number = ?",
+                new BigDecimal("1234.50000001"),
+                "GB00MERIDIAN00000001");
+
         List<Account> accounts = accountRepository.findByCustomerIdOrderById(1L);
 
         assertThat(accounts).extracting(Account::getBalance)
@@ -58,7 +65,7 @@ class AccountDatabaseIntegrationTest {
     void shouldReflectOwnershipFixtureChanges() {
         Account account = accountRepository.findByCustomerIdOrderById(1L).getFirst();
 
-                jdbcTemplate.update("UPDATE account SET customer_id = ? WHERE id = ?", 2L, account.getId());
+        jdbcTemplate.update("UPDATE account SET customer_id = ? WHERE id = ?", 2L, account.getId());
 
         assertThat(accountRepository.findByCustomerIdOrderById(1L))
                 .noneMatch(candidate -> candidate.getAccountNumber().equals(account.getAccountNumber()));

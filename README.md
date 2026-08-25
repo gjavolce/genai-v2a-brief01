@@ -14,15 +14,35 @@ it, one feature at a time.
 3. Open **http://localhost:5173**. You should see a list of customers, served
    from a real database. That's your baseline.
 4. Open Claude Code. Run **`/agents`** — expect **4 subagents**. Type **`/`** —
-   expect **3 commands**. Two more appear after Task 00.
+   expect **3 commands** and **`/orchestrator`**. Two more appear after Task 00.
 5. Open `docs/TASKS.md`.
 
 Anything missing, say so now — not at 14:00.
 
+### Use Codex
+
+Start a new Codex session with a Sol model. Codex reads `AGENTS.md` and then
+reads the shared rules in `CLAUDE.md`.
+
+Use `$` to select these repository skills:
+
+`$business-analyst` · `$architect` · `$feature-kickoff` · `$feature-plan` ·
+`$feature-close` · `$orchestrator`
+
+Codex loads the project agents from `.codex/agents/`. The orchestrator uses the
+faster model that each agent file specifies. The Codex skills use the workflow
+instructions in `.claude/`. Thus, Claude and Codex use the same workflow rules.
+All Codex agents use low output verbosity. If you waive the remaining gate-5
+checks, the implementer runs the remaining plan tasks in one batch.
+
+For Codex, replace `/skill-name NN` in this guide with `$skill-name NN`. The
+subagent requests do not change.
+
 ## What's here, and what isn't
 
 **Here:** a working full-stack application (database → API → React), the business
-brief, eleven tasks, four subagents, and three slash commands.
+brief, eleven tasks, four subagents, three slash commands, and `/orchestrator`,
+which runs the whole loop below for you.
 
 **Not here:** acceptance criteria, functional requirements, non-functional
 requirements, architecture decisions. Producing those is the job, and **Task 00**
@@ -137,7 +157,9 @@ Use the code-reviewer subagent to review the diff for task 04
 Use the security-reviewer subagent to review the diff for task 04
 ```
 
-You have to write that one yourself — a later task.
+You have to write that one yourself — a later task. Until you do, nothing has
+reviewed this diff for security. Skipping it knowingly is a decision; skipping it
+without noticing is the thing this workshop is about.
 
 **19. 🚦 Read both sets of findings**, then type the line `code-reviewer`
 printed. Fix HIGH and MEDIUM. Leave LOW unless it's free.
@@ -187,6 +209,22 @@ Use the implementer subagent to fix every HIGH and MEDIUM finding above
 Each agent ends by printing the next line for you. Copy it — or don't, if you
 disagree with the verdict. Nothing runs until you send it.
 
+## Or `/orchestrator 04`
+
+Once you have done the loop by hand — and you should, at least once — the
+orchestrator types those thirteen lines for you.
+
+It does not remove a single gate. It runs a step, reports what came back, and
+**stops to ask you** at every 🚦 below. You approve, you send it back for another
+pass, or you stop. Nothing moves past a gate without your answer.
+
+Stop at a gate, hand-edit the document, run `/orchestrator 04` again — it reads
+what is already in `docs/features/04/` and resumes from there.
+
+What it will not do: commit, push, open a PR, or decide a gate on your behalf.
+It needs Task 00 finished first, since steps 3 and 5 are the two skills you build
+there.
+
 ## The seven gates
 
 Every 🚦 is a point where **you** decide, not the tool:
@@ -206,6 +244,9 @@ to be worth doing.
 ## Your four subagents
 
 They live in `.claude/agents/`. Run `/agents` to see them.
+
+Codex loads equivalent agents from `.codex/agents/`. Codex also has a read-only
+`planner` agent for the orchestrator plan phase.
 
 | Subagent | `tools:` | Does |
 |---|---|---|
@@ -240,3 +281,5 @@ which is exactly why you read the diff.
 | A subagent edited something it shouldn't | Check its `tools:` list, then `git checkout` the file. Being wrong is cheap; not looking is expensive. |
 | Plan mode won't write the plan out | Correct — it can't. That is what `/feature-plan NN` is for. Run it in the same session. |
 | `/architect` refuses to run | You skipped `/business-analyst`. That's deliberate. |
+| `/orchestrator` stops before it starts | Task 00 isn't done. It needs `/business-analyst` and `/architect` to exist. |
+| `/orchestrator` re-ran and skipped a step | Correct — it resumes from the first missing file in `docs/features/NN/`. Delete the file to redo that step. |

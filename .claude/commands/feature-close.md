@@ -1,77 +1,78 @@
 ---
-description: Close out a finished feature — PR description, progress, commit
+description: Prepare close-out documents for a reviewed feature.
 argument-hint: <task-number, e.g. 01>
 allowed-tools: Read, Write, Edit, Grep, Glob, Bash
 ---
 
 # Task
 
-Task $1 has passed the review chain. Close it out.
+Close task `$1` after the review chain passes.
 
-# Stop first if any of these are untrue
+# Preconditions
 
-- `./verify.sh` is green
-- `code-reviewer` and `security-reviewer` both report zero HIGH findings
-- the working branch is `feature/$1-*`, not `main`
-- the diff touches the database, the backend **and** the frontend
+Stop if any condition is false. State the failed condition.
 
-If any fails, say which and stop. Closing out a red feature is how a broken
-build reaches the next person — and on `main`, how it reaches everyone.
+- `./verify.sh` is green.
+- `code-reviewer` has no HIGH finding.
+- If the current client has a `security-reviewer`, it has no HIGH finding.
+- If no security reviewer exists, state that no security review ran.
+- Ask the user whether to continue without the security review.
+- Do not treat a missing review as a passing review.
+- The branch is `feature/$1-*`, not `main`.
+- The diff changes database, backend, and frontend.
 
-# Constraints
+# Rules
 
-- The PR description comes from `docs/features/$1/$1-plan.md`, which already
-  holds the why and the what. Do not reconstruct it from the diff; the plan is
-  the better source.
-- Do not modify anything under `src/main`. This step is documentation only.
+- Use `docs/features/$1/$1-plan.md` as the PR description source.
+- Do not reconstruct the PR description from the diff.
+- Modify only `docs/features/$1/$1-PR.md` and
+  `docs/features/$1/$1-acceptance.md`.
+- Do not modify `api/src/main/**` or `web/src/**`.
+- This is a documentation step.
+- Suggest git commands, but never run `git commit`, `git push`, or `gh pr create`.
 
-# Expected output
+# Output
 
-**1. `docs/features/$1/$1-PR.md`**
+1. Write `docs/features/$1/$1-PR.md` with this structure:
 
-```markdown
-## Task $1 — <title>
+   ```markdown
+   ## Task $1 — <title>
 
-### What
-One paragraph. The capability, not the implementation.
+   ### What
+   One paragraph about the capability, not its implementation.
 
-### Why
-The business requirement, and the FRs it satisfies.
+   ### Why
+   The business requirement and satisfied functional requirements.
 
-### How
-Bullets from the plan's task list. Name the ADR this change follows.
+   ### How
+   Bullets from the plan task list. Name the ADR.
 
-### Layers changed
-Database · Backend · Frontend — one line each, naming files.
+   ### Layers changed
+   Database · Backend · Frontend — one line each that names files.
 
-### Testing
-Which tests prove which acceptance criterion. Confirm ./verify.sh green.
+   ### Testing
+   Map tests to acceptance criteria. Confirm `./verify.sh` is green.
 
-### Review findings
-What the reviewers raised and how it was resolved. "Clean" is a legitimate
-and useful entry.
+   ### Review findings
+   State reviewer findings and their resolution. Use `Clean` when applicable.
 
-### Not included
-What was deliberately left out, and why. Anything noticed but not fixed.
-```
+   ### Not included
+   State excluded work, reasons, and noticed but unfixed items.
+   ```
 
-**2. Update `docs/features/$1/$1-acceptance.md`** — tick each criterion that now
-has a passing test, by its id, naming the test. If any criterion changed during
-implementation, record the change and the reason. Criteria drift is normal;
-undocumented drift is not.
+2. Update `docs/features/$1/$1-acceptance.md`. Tick each criterion with a
+   passing test. Use the criterion ID and name the test. Record each criterion
+   change and its reason.
 
-**3. Suggest the git commands** — a conventional-commit message with the task
-number in the subject, then the push and PR commands for this branch. Do not run
-them; I will.
+3. Suggest a conventional commit message. Put the task number in the subject.
+   Suggest push and PR commands for this branch. Do not run them.
 
-**4. Report readiness for the next task** — anything discovered here that
-changes the next feature's assumptions. This is the most valuable line in the
-output and the easiest to skip.
+4. Report items that change assumptions for the next task.
 
-# Verification
+# Verify
 
-- `./verify.sh` was green when you checked. Say when.
-- Every acceptance criterion is ticked or explicitly explained.
-- All three layers appear under "Layers changed".
-- "Not included" is honest — it should list what you noticed and chose not to fix.
-- Nothing under `src/main` was modified by this step.
+- State when `./verify.sh` was green.
+- Every criterion is ticked or explicitly explained.
+- The PR document names all three layers.
+- `Not included` is complete and accurate.
+- No file in `api/src/main/**` or `web/src/**` changed.

@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 # The green gate.
 #
-# Environment → tests → start the app → health → smoke test.
-# The database is a devcontainer service and is always running, so this script
-# never starts or stops a container.
+# docker compose up → health → smoke test.
 set -uo pipefail
 
 fail=0
@@ -12,51 +10,26 @@ ok()   { echo "✅"; }
 bad()  { echo "❌  $1"; fail=1; }
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
-DB_HOST="${DB_HOST:-db}"
-DB_PORT="${DB_PORT:-3306}"
-# Port 8080 belongs to whatever the participant is running. This script uses its
-# own so verifying never kills their app, and their app never fails this script.
-APP_PORT="${APP_PORT:-8081}"
-
-APP_PID=""
-BUILD_LOG="$(mktemp)"
-APP_LOG="$(mktemp)"
-
-cleanup() {
-  if [ -n "$APP_PID" ] && kill -0 "$APP_PID" 2>/dev/null; then
-    kill "$APP_PID" 2>/dev/null
-    wait "$APP_PID" 2>/dev/null
-  fi
-  rm -f "$BUILD_LOG" "$APP_LOG"
-}
-trap cleanup EXIT
+API_HOST="${API_HOST:-localhost}"
+API_PORT="${API_PORT:-8080}"
 
 echo ""
 echo "Environment"
 echo "────────────────────────────────────────────"
 
-step "Java 21"
-if java -version 2>&1 | grep -q '"21'; then ok
-else bad "Java 21 not active — found: $(java -version 2>&1 | head -1)"; fi
+step "Docker"
+if docker info >/dev/null 2>&1; then ok; else bad "Docker is not running"; fi
 
-step "Maven wrapper"
-if [ -x "$ROOT/api/mvnw" ]; then ok; else bad "api/mvnw is missing or not executable"; fi
+step "CLAUDE.md"
+if [ -f "$ROOT/CLAUDE.md" ]; then ok; else bad "missing CLAUDE.md"; fi
 
-step "Node 20+"
-v=$(node --version 2>/dev/null | sed 's/v\([0-9]*\).*/\1/')
-if [ -n "${v:-}" ] && [ "$v" -ge 20 ] 2>/dev/null; then ok
-else bad "Node 20+ not found (got ${v:-none})"; fi
+step "Subagents"
+n=$(ls -1 "$ROOT"/.claude/agents/*.md 2>/dev/null | wc -l | tr -d ' ')
+if [ "${n:-0}" -ge 4 ]; then ok; else bad "expected 4 in .claude/agents, found ${n:-0}"; fi
 
-step "MySQL reachable"
-if (echo > /dev/tcp/"$DB_HOST"/"$DB_PORT") 2>/dev/null; then ok
-else bad "nothing listening on $DB_HOST:$DB_PORT — is the db service healthy?"; fi
-
-step "Copilot instructions"
-if [ -f "$ROOT/.github/copilot-instructions.md" ]; then ok; else bad "missing .github/copilot-instructions.md"; fi
-
-step "Agents"
-n=$(ls -1 "$ROOT"/.github/agents/*.agent.md 2>/dev/null | wc -l | tr -d ' ')
-if [ "${n:-0}" -ge 4 ]; then ok; else bad "expected 4 in .github/agents, found ${n:-0}"; fi
+step "Commands"
+n=$(ls -1 "$ROOT"/.claude/commands/*.md 2>/dev/null | wc -l | tr -d ' ')
+if [ "${n:-0}" -ge 3 ]; then ok; else bad "expected 3 in .claude/commands, found ${n:-0}"; fi
 
 if [ "$fail" != "0" ]; then
   echo "────────────────────────────────────────────"
@@ -65,58 +38,43 @@ if [ "$fail" != "0" ]; then
 fi
 
 echo ""
-echo "Build and test"
+echo "Starting containers"
 echo "────────────────────────────────────────────"
 
-step "Unit and slice tests"
-if ( cd "$ROOT/api" && ./mvnw -q -B package ) > "$BUILD_LOG" 2>&1; then
+step "docker compose up"
+if ( cd "$ROOT" && docker compose up -d --build ) > /tmp/verify-compose.$$ 2>&1; then
   ok
 else
-  bad "the build failed — run ./mvnw test in api/ to see which test broke"
-  echo ""
-  echo "  last 25 lines of the build:"
-  tail -25 "$BUILD_LOG" | sed 's/^/    /'
-  echo "────────────────────────────────────────────"
+  bad "docker compose up failed"
+  tail -25 /tmp/verify-compose.$$ | sed 's/^/    /'
+  rm -f /tmp/verify-compose.$$
   exit 1
 fi
+rm -f /tmp/verify-compose.$$
 
 echo ""
 echo "Running application"
 echo "────────────────────────────────────────────"
 
-step "Application starts"
-SERVER_PORT="$APP_PORT" java -jar "$ROOT/api/target/capstone.jar" > "$APP_LOG" 2>&1 &
-APP_PID=$!
-
+step "Backend healthy"
 health_ok=0
 for _ in $(seq 1 60); do
-  if ! kill -0 "$APP_PID" 2>/dev/null; then
-    break
-  fi
-  if curl -sf "http://127.0.0.1:$APP_PORT/actuator/health" 2>/dev/null | grep -q '"status":"UP"'; then
+  if curl -sf "http://$API_HOST:$API_PORT/actuator/health" 2>/dev/null | grep -q '"status":"UP"'; then
     health_ok=1
     break
   fi
   sleep 1
 done
-
 if [ "$health_ok" = "1" ]; then
   ok
 else
-  if kill -0 "$APP_PID" 2>/dev/null; then
-    bad "the app did not report healthy within 60 seconds on port $APP_PORT"
-  else
-    bad "the app exited during startup — most often the database or a migration"
-  fi
-  echo ""
-  echo "  last 25 lines of the application log:"
-  tail -25 "$APP_LOG" | sed 's/^/    /'
-  echo "────────────────────────────────────────────"
+  bad "the backend did not report healthy within 60 seconds on port $API_PORT"
+  ( cd "$ROOT" && docker compose logs --tail=25 backend ) | sed 's/^/    /'
   exit 1
 fi
 
 step "GET /api/customers"
-body="$(curl -s -o /tmp/verify-body.$$ -w '%{http_code}' "http://127.0.0.1:$APP_PORT/api/customers" 2>/dev/null)"
+body="$(curl -s -o /tmp/verify-body.$$ -w '%{http_code}' "http://$API_HOST:$API_PORT/api/customers" 2>/dev/null)"
 if [ "$body" = "200" ] && grep -q '"reference"' /tmp/verify-body.$$ 2>/dev/null; then
   ok
 elif [ "$body" = "200" ]; then
@@ -131,8 +89,8 @@ if [ "$fail" = "0" ]; then
   echo "✅ All green."
   echo ""
   echo "   Now the part the shell cannot check for you:"
-  echo "   1. Open Chat → agent picker → expect 4 agents"
-  echo "   2. Type / in Chat        → expect 2 slash commands"
+  echo "   1. Run /agents  → expect 4 subagents"
+  echo "   2. Type /       → expect 3 commands"
   echo ""
 else
   echo "❌ Fix the above before continuing."

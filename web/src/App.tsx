@@ -1,9 +1,13 @@
 import { useEffect, useState } from 'react'
+import { fetchAccounts, type Account } from './api/accounts'
 import { fetchCustomer, fetchCustomers, type Customer } from './api/customers'
 
 export default function App() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [selected, setSelected] = useState<Customer | null>(null)
+  const [accounts, setAccounts] = useState<Account[]>([])
+  const [accountsLoading, setAccountsLoading] = useState(false)
+  const [accountsError, setAccountsError] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -15,9 +19,18 @@ export default function App() {
   }, [])
 
   function select(id: number) {
+    setAccountsLoading(true)
+    setAccountsError(null)
+    setAccounts([])
+
     fetchCustomer(id)
       .then(setSelected)
       .catch((cause: Error) => setError(cause.message))
+
+    fetchAccounts(id)
+      .then(setAccounts)
+      .catch((cause: Error) => setAccountsError(cause.message))
+      .finally(() => setAccountsLoading(false))
   }
 
   return (
@@ -76,6 +89,35 @@ export default function App() {
             <dd>{selected.status}</dd>
           </dl>
           <button onClick={() => setSelected(null)}>Close</button>
+
+          <h3>Accounts</h3>
+          {accountsLoading && <p>Loading accounts...</p>}
+          {accountsError && <p role="alert">Could not load accounts: {accountsError}</p>}
+          {!accountsLoading && !accountsError && accounts.length === 0 && (
+            <p>No accounts held.</p>
+          )}
+          {!accountsLoading && !accountsError && accounts.length > 0 && (
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Account number</th>
+                  <th>Currency</th>
+                  <th>Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {accounts.map((account) => (
+                  <tr key={account.accountNumber}>
+                    <td>{account.accountName}</td>
+                    <td>{account.accountNumber}</td>
+                    <td>{account.currency}</td>
+                    <td>{account.balance}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </section>
       )}
     </main>

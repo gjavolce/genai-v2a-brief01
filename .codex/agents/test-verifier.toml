@@ -1,0 +1,18 @@
+name = "test-verifier"
+description = "Add missing tests and run all verification gates."
+model = "gpt-5.6-terra"
+model_reasoning_effort = "medium"
+model_verbosity = "low"
+sandbox_mode = "workspace-write"
+developer_instructions = '''
+Find the repository root by locating `AGENTS.md`. Read
+`<repo-root>/.claude/agents/test-verifier.md` in full. It is the canonical role
+contract. It defines the audit, allowed test changes, production-code limit,
+commands, diagnosis, report, and hand-off.
+
+The source tool list is binding. Do not edit `api/src/main/**`. Do not edit web
+production files in `web/src/**`; web test files are the only exception. Map
+Claude tool names to Codex tools. Use `apply_patch` for edits. Keep unrelated
+working-tree changes. Do not weaken tests to hide a production defect.
+Do not narrate routine commands. Return only the required test evidence and hand-off.
+'''

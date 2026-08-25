@@ -30,17 +30,19 @@ about to do ten times — which is exactly what a skill is for.
 
 ## Part A — `business-analyst` (~15 min)
 
-**Goes at:** `.github/skills/business-analyst/SKILL.md`
+**Goes at:** `.claude/skills/business-analyst/SKILL.md`
 **Start from:** `docs/exercises/business-analyst-skill.skeleton.md`
 
 Given a task number, `/business-analyst NN` reads `docs/brief.md` and
-`docs/tasks/NN-*.md` and writes **`docs/features/NN/acceptance.md`**:
+`docs/tasks/NN-*.md` and writes **`docs/features/NN/NN-acceptance.md`**:
 
 - **Functional requirements** — `FR-NN-1`, `FR-NN-2`, … Each a single testable
   statement about behaviour. No technology words.
-- **Acceptance criteria** — for each FR, the concrete cases that prove it,
-  including the unhappy ones. "Rejects a transfer that would overdraw" is worth
-  more than three happy-path criteria.
+- **Acceptance criteria** — `AC-NN-1.1`, `AC-NN-1.2`, … under `FR-NN-1`. For
+  each FR, the concrete cases that prove it, including the unhappy ones.
+  "Rejects a transfer that would overdraw" is worth more than three happy-path
+  criteria. Every criterion needs its own id — three agents downstream report
+  against those ids, and they must all mean the same thing.
 - **Open questions** — anything the requirement doesn't answer. Do not guess and
   move on; a business requirement with no gaps hasn't been read carefully.
 
@@ -48,14 +50,14 @@ Given a task number, `/business-analyst NN` reads `docs/brief.md` and
 
 ## Part B — `architect` (~15 min)
 
-**Goes at:** `.github/skills/architect/SKILL.md`
+**Goes at:** `.claude/skills/architect/SKILL.md`
 **Start from:** `docs/exercises/architect-skill.skeleton.md`
 
 You've just built one skill. This is the same shape, so it should be faster.
 
 Given a task number, `/architect NN` reads the brief, the task file, **the
 acceptance criteria the business analyst just produced**, and any earlier ADRs
-under `docs/features/*/adr.md`, then writes **`docs/features/NN/adr.md`**:
+under `docs/features/*/*-adr.md`, then writes **`docs/features/NN/NN-adr.md`**:
 
 - **The decision(s)** this feature forces — context, at least two real options
   with honest trade-offs, the decision, consequences including a genuine
@@ -88,9 +90,9 @@ things.
 ## Done when
 
 - [ ] `/business-analyst` and `/architect` both appear in the slash picker
-- [ ] `/business-analyst 01` writes `docs/features/01/acceptance.md`
-- [ ] `/architect 01` writes `docs/features/01/adr.md` and reads the acceptance
-      criteria first
+- [ ] `/business-analyst 01` writes `docs/features/01/01-acceptance.md`
+- [ ] `/architect 01` writes `docs/features/01/01-adr.md` and reads the
+      acceptance criteria first
 - [ ] Every FR is testable — you can name the test for each
 - [ ] The ADR has two real options, not one and a straw man
 - [ ] Neither document is silent on the four questions

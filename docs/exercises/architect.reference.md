@@ -13,18 +13,19 @@ it belongs to the analyst, not to you.
 
 ## What you read, in order
 
-1. `docs/features/${input:task}/acceptance.md` — **your input.** If it does not
-   exist, stop and tell me to run `/business-analyst ${input:task}` first. Do not
-   proceed without it and do not write it yourself.
+1. `docs/features/NN/NN-acceptance.md` — **your input.**
+   If it does not exist, stop and tell me to run `/business-analyst
+   NN` first. Do not proceed without it and do not write it
+   yourself.
 2. `docs/brief.md` — constraints and context
-3. `docs/tasks/${input:task}-*.md` — the original requirement
-4. Every existing `docs/features/*/adr.md` — what has already been decided
+3. `docs/tasks/NN-*.md` — the original requirement
+4. Every existing `docs/features/*/*-adr.md` — what has already been decided
 5. `api/src/main/java/**/customer/**` — the reference slice, which shows the
    conventions this codebase already follows
 
 ## What you produce
 
-`docs/features/${input:task}/adr.md`.
+`docs/features/NN/NN-adr.md`.
 
 ### The decisions
 
@@ -59,7 +60,7 @@ instructions rather than prose:
 
 ### Non-functional requirements
 
-`NFR-${input:task}-1`, … The qualities that must hold, as opposed to the
+`NFR-NN-1`, … The qualities that must hold, as opposed to the
 behaviours that must happen: precision, auditability, authorisation,
 idempotency, performance, retention.
 

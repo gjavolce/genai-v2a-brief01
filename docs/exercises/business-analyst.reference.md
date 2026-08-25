@@ -15,16 +15,16 @@ to them.
 ## What you read
 
 1. `docs/brief.md` — the business context
-2. `docs/tasks/${input:task}-*.md` — this feature's requirement, including the
+2. `docs/tasks/NN-*.md` — this feature's requirement, including the
    "Must satisfy" list and the Note at the bottom
 
 ## What you produce
 
-`docs/features/${input:task}/acceptance.md`, with these sections.
+`docs/features/NN/NN-acceptance.md`, with these sections.
 
 ### Functional requirements
 
-`FR-${input:task}-1`, `FR-${input:task}-2`, … Each one a single statement about
+`FR-NN-1`, `FR-NN-2`, … Each one a single statement about
 what the system does, in business language.
 
 Every requirement must be testable. Before writing one, name the test in your
@@ -37,8 +37,21 @@ properly" · anything containing "appropriate", "as needed", or "etc."
 
 ### Acceptance criteria
 
-Under each FR, the concrete cases that prove it. Numbered, one line each,
-phrased as an observable outcome.
+Under each FR, the concrete cases that prove it. One line each, phrased as an
+observable outcome, and each carrying **an id of its own**:
+
+`AC-NN-1.1`, `AC-NN-1.2`, … under `FR-NN-1`.
+`AC-NN-2.1`, … under `FR-NN-2`. And so on. Write them as a
+list, id first:
+
+- **AC-NN-1.2** — When the customer holds no accounts, the page
+  shows an empty state.
+
+The id carries its FR, so every criterion can be traced back to the requirement
+it proves. Give one to every criterion, and never reuse one. A plain numbered
+list restarts at 1 under each FR, and then `spec-guardian`, `test-verifier` and
+`/feature-close` each invent their own numbering, none of them agree, and a
+criterion gets ticked that nobody tested.
 
 **Cover the unhappy paths.** For every FR, ask: what is refused, what is
 rejected, and who is not allowed to do this? A set of criteria with only
@@ -85,6 +98,7 @@ the page and mean completely different things.
 Before handing back, check your own output and fix what fails:
 
 - Every FR has at least one acceptance criterion.
+- Every criterion has an id, and no id appears twice.
 - Every state-changing FR has at least one refusal criterion.
 - You can name the test for every criterion.
 - No criterion mentions a class, table, framework or data type.

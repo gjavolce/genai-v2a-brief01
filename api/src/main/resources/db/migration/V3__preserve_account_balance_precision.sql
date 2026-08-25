@@ -1,0 +1,2 @@
+ALTER TABLE account
+    MODIFY COLUMN balance DECIMAL(19,8) NOT NULL;

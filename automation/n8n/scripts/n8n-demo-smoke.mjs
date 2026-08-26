@@ -13,6 +13,7 @@ const cookie = login.headers.get('set-cookie')?.split(';', 1)[0];
 if (!cookie) throw new Error('n8n login did not return an authentication cookie');
 
 const scenario = process.env.N8N_DEMO_SCENARIO ?? 'happy-path';
+let revisionsRequested = 0;
 const initial = new FormData();
 for (const [name, value] of Object.entries({
   'field-0': 'new-demo',
@@ -89,8 +90,6 @@ async function waitForForm(url) {
   }
   throw new Error('n8n did not produce the next form');
 }
-
-let revisionsRequested = 0;
 
 function decisionFor(title) {
   // A failed action must offer a decision, not a dead execution.

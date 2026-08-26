@@ -77,6 +77,21 @@ assert.deepEqual(targets('Remaining Tasks Exist?', 1), ['Phase 7 Tests — Start
 // A wall-clock request ID would defeat the runner's idempotence.
 assert(!JSON.stringify(main).includes('Date.now()'), 'request IDs must not use Date.now()');
 
+// The runner rejects a request ID under eight characters. Every action must clear that on
+// the shortest possible execution ID and run index.
+for (const node of main.nodes.filter((n) => String(n.parameters?.body ?? '').includes('requestId'))) {
+  const built = String(node.parameters.body).match(/requestId: (.+?), resume:/)?.[1];
+  assert(built, `${node.name} has no readable requestId expression`);
+  const shortest = built
+    .replace(/\$execution\.id/g, '1')
+    .replace(/\$runIndex/g, '0')
+    .split('+')
+    .map((part) => part.trim().replace(/^'|'$/g, ''))
+    .join('');
+  assert(shortest.length >= 8, `${node.name} builds a ${shortest.length}-character requestId ("${shortest}"); the runner needs 8`);
+  assert(/^[A-Za-z0-9._:-]+$/.test(shortest), `${node.name} builds an unsafe requestId "${shortest}"`);
+}
+
 // Every node must be reachable from the trigger.
 const seen = new Set();
 const pending = ['Start or Resume PayFlow'];
@@ -88,6 +103,15 @@ while (pending.length) {
 }
 const orphans = main.nodes.map((node) => node.name).filter((name) => !seen.has(name));
 assert.deepEqual(orphans, [], `unreachable nodes: ${orphans.join(', ')}`);
+
+// The polling loop re-enters Get Job with the Job object, so the URL must accept both shapes.
+const getJob = poll.nodes.find((node) => node.name === 'Get Job');
+assert(getJob, 'the polling workflow needs a Get Job node');
+assert(
+  /\$json\.jobId \|\| \$json\.id/.test(String(getJob.parameters.url)),
+  'Get Job must read $json.jobId || $json.id, or the second poll requests /v1/jobs/undefined',
+);
+assert.equal(getJob.retryOnFail, true, 'Get Job must tolerate a transient failure');
 
 process.stdout.write(`Validated ${main.nodes.length} main nodes, ${poll.nodes.length} polling nodes, ten phases, seven gates, and every failure path.\n`);
 

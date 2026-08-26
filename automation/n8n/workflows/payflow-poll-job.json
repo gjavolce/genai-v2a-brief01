@@ -31,8 +31,11 @@
         240,
         0
       ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000,
       "parameters": {
-        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/jobs/' + $json.jobId }}",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/jobs/' + ($json.jobId || $json.id) }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

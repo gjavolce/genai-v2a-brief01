@@ -78,7 +78,9 @@ function action(name, actionName, position, payload = '{}') {
     'POST',
     "/v1/runs/' + ($json.runId || $json.id) + '/actions",
     // $runIndex, not Date.now(): a retried node run must reuse its job instead of starting a second one.
-    `{ action: '${actionName}', requestId: $execution.id + ':${actionName}:' + $runIndex, resume: true, payload: ${payload} }`,
+    // The literal prefix keeps the ID above the runner's eight-character minimum for a
+    // short execution ID and a short action name.
+    `{ action: '${actionName}', requestId: 'payflow-' + $execution.id + '-${actionName}-' + $runIndex, resume: true, payload: ${payload} }`,
     position,
   );
 }
@@ -454,8 +456,13 @@ function pollingWorkflow() {
       typeVersion: 4.2,
       position: [240, 0],
       ...authCredentials(),
+      // The loop re-enters this node with the Job object, which carries `id`, not `jobId`.
+      // Reading only `jobId` requested /v1/jobs/undefined on every iteration after the first.
+      retryOnFail: true,
+      maxTries: 3,
+      waitBetweenTries: 2000,
       parameters: {
-        url: `={{ ${urlBase} + '/v1/jobs/' + $json.jobId }}`,
+        url: `={{ ${urlBase} + '/v1/jobs/' + ($json.jobId || $json.id) }}`,
         ...authParameters(),
         options: { timeout: 30000 },
       },

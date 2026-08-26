@@ -111,9 +111,13 @@ the workflows:
 automation/n8n/bin/import-workflows.sh
 ```
 
-Open `PayFlow Feature Orchestrator`, publish it, and open the production form
-URL from the `Start or Resume PayFlow` node. Import the polling workflow first;
-the import script already uses that order.
+The script imports the polling workflow first, activates both, restarts n8n, and
+confirms that the form answers. Run it again after every
+`npm run generate:workflows`. An import writes `active=false` from the file, and
+n8n registers the form webhook only at start-up, so the activate and restart
+steps are not optional.
+
+Then open <http://localhost:5678/form/payflow> and sign in as the owner.
 
 The runner listens only on `127.0.0.1:5680`. The n8n container reaches it with
 `host.docker.internal`. The n8n UI listens only on `127.0.0.1:5678` and uses

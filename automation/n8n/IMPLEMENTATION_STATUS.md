@@ -117,20 +117,64 @@ status check and an error route, that the recovery cluster is wired, that the
 re-plan edges stamp an intent, that no request ID uses `Date.now()`, and that
 every node is reachable from the trigger.
 
-## Not verified in this pass
+## Live verification
 
-1. No live n8n instance ran during this work. The generated JSON validates and
-   the node graph is fully reachable, but the new forms and error branches have
-   not been traversed in a browser. Run `npm run smoke:n8n-demo`,
-   `npm run smoke:n8n-failure`, and `npm run smoke:n8n-revision` before relying
-   on them.
-2. The Claude engine has never executed a real action. Its flags come from
+A disposable n8n 2.36.7 instance ran on ports 5688 and 5689, with its own volume
+and runs directory. It was removed afterwards. The owner account was created
+through `POST /rest/owner/setup`, so no manual browser step was needed.
+
+Confirmed:
+
+- Both workflows imported. A round-trip export preserved 101 nodes, all 15
+  polling error routes, and all 15 job-status checks.
+- The production form requires the n8n owner login. It answers 302 to an
+  anonymous request.
+- `happy-path` traversed nine wait forms and completed. The final audit passed
+  with no failures.
+- `repeated-failure` reached the **Action failed** form and stopped cleanly. The
+  execution did not end in error.
+- `no-go-revision` traversed eleven wait forms. Gate 4 returned NO-GO, the plan
+  was revised, the second spec check returned GO, and the run completed with a
+  passing final audit.
+- The NO-GO run recorded `coverage.uncoveredCriteria = ["AC-04-1.2"]`, which
+  confirms the per-line gap parsing.
+
+### Two defects that only the live run found
+
+1. **Request IDs were too short.** `$execution.id + ':' + action + ':' +
+   $runIndex` produced `1:adr:0`, which is seven characters. The runner requires
+   eight. `Date.now()` had hidden the rule. Request IDs now carry a `payflow-`
+   prefix, and `validate-workflows.mjs` computes the shortest possible ID for
+   every action and asserts the length and the character set.
+
+2. **The polling loop requested `/v1/jobs/undefined`.** `Get Job` read
+   `$json.jobId`. That field exists only on the first iteration, which comes
+   from the sub-workflow trigger. After `Wait Two Seconds` the item is the Job
+   object, which carries `id`. Every iteration after the first therefore
+   requested an unmatched path and returned 404. Demo jobs finish in about
+   twenty milliseconds, so the loop almost never ran and the defect stayed
+   hidden. **A real run, where every job takes minutes, would have failed at the
+   first action.** `Get Job` now reads `$json.jobId || $json.id` and retries
+   three times. The validator asserts both.
+
+This defect predates this pass. It means no real run could ever have completed.
+
+### Also corrected
+
+`bin/import-workflows.sh` now activates both workflows and restarts n8n after an
+import. An import writes `active=false` from the file, and n8n registers the form
+webhook only at start-up, so a re-import used to leave the form returning 404.
+
+## Not verified
+
+1. The Claude engine has never executed a real action. Its flags come from
    `claude -h` on version 2.1.231 and its argument building is unit-tested, but
    no `claude -p` process has run through the runner. Use
    `PAYFLOW_ENGINE=claude npm run smoke:real` first. That smoke is read-only.
-3. The Header Auth credential path is generated and validated but not imported
-   into a live instance.
-4. The opt-in Task 01 real smoke has not run on either engine.
+2. The Header Auth credential path is generated and validated but was not
+   imported into the live instance.
+3. The opt-in Task 01 real smoke has not run on either engine. No real action
+   has run on any engine.
 
 ## Known limits
 

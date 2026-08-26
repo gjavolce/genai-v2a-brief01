@@ -579,7 +579,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ action: 'branch', requestId: $execution.id + ':branch:' + $runIndex, resume: true, payload: { decision: $json.decision, baseDeviationAcknowledged: String($json.baseDeviationAcknowledged) === 'true', overwriteExistingArtifacts: String($json.overwriteExistingArtifacts) === 'true' } }) }}"
+        "body": "={{ JSON.stringify({ action: 'branch', requestId: 'payflow-' + $execution.id + '-branch-' + $runIndex, resume: true, payload: { decision: $json.decision, baseDeviationAcknowledged: String($json.baseDeviationAcknowledged) === 'true', overwriteExistingArtifacts: String($json.overwriteExistingArtifacts) === 'true' } }) }}"
       }
     },
     {
@@ -1095,7 +1095,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ action: 'acceptance', requestId: $execution.id + ':acceptance:' + $runIndex, resume: true, payload: { overwriteArtifact: String($json.resumeArtifactConsent) === 'true' || $json.gates?.['1']?.decision === 'revise' || $json.artifactOverwriteAcknowledged === true || $json.evidence?.artifactOverwriteAcknowledged === true, revisionNote: $json.gates?.['1']?.decision === 'revise' ? ($json.gates['1'].details.revisionNote || undefined) : undefined } }) }}"
+        "body": "={{ JSON.stringify({ action: 'acceptance', requestId: 'payflow-' + $execution.id + '-acceptance-' + $runIndex, resume: true, payload: { overwriteArtifact: String($json.resumeArtifactConsent) === 'true' || $json.gates?.['1']?.decision === 'revise' || $json.artifactOverwriteAcknowledged === true || $json.evidence?.artifactOverwriteAcknowledged === true, revisionNote: $json.gates?.['1']?.decision === 'revise' ? ($json.gates['1'].details.revisionNote || undefined) : undefined } }) }}"
       }
     },
     {
@@ -1379,7 +1379,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ action: 'adr', requestId: $execution.id + ':adr:' + $runIndex, resume: true, payload: { overwriteArtifact: String($json.resumeArtifactConsent) === 'true' || $json.gates?.['2']?.decision === 'revise' || $json.artifactOverwriteAcknowledged === true, revisionNote: $json.gates?.['2']?.decision === 'revise' ? ($json.gates['2'].details.revisionNote || undefined) : undefined } }) }}"
+        "body": "={{ JSON.stringify({ action: 'adr', requestId: 'payflow-' + $execution.id + '-adr-' + $runIndex, resume: true, payload: { overwriteArtifact: String($json.resumeArtifactConsent) === 'true' || $json.gates?.['2']?.decision === 'revise' || $json.artifactOverwriteAcknowledged === true, revisionNote: $json.gates?.['2']?.decision === 'revise' ? ($json.gates['2'].details.revisionNote || undefined) : undefined } }) }}"
       }
     },
     {
@@ -1663,7 +1663,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ action: 'kickoff', requestId: $execution.id + ':kickoff:' + $runIndex, resume: true, payload: { overwriteArtifact: String($json.resumeArtifactConsent) === 'true' || $json.artifactOverwriteAcknowledged === true } }) }}"
+        "body": "={{ JSON.stringify({ action: 'kickoff', requestId: 'payflow-' + $execution.id + '-kickoff-' + $runIndex, resume: true, payload: { overwriteArtifact: String($json.resumeArtifactConsent) === 'true' || $json.artifactOverwriteAcknowledged === true } }) }}"
       }
     },
     {
@@ -1770,7 +1770,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ action: 'plan', requestId: $execution.id + ':plan:' + $runIndex, resume: true, payload: { overwriteArtifact: true, answer: $json.plannerAnswer || undefined, sharpenTask: $json.planIntent === 'sharpen' ? ($json.gates['3'].details.sharpenTask || undefined) : undefined, coverageRevision: $json.planIntent === 'coverage-revision', revisionNote: $json.planIntent === 'coverage-revision' ? ($json.gates['4'].details.revisionNote || undefined) : undefined } }) }}"
+        "body": "={{ JSON.stringify({ action: 'plan', requestId: 'payflow-' + $execution.id + '-plan-' + $runIndex, resume: true, payload: { overwriteArtifact: true, answer: $json.plannerAnswer || undefined, sharpenTask: $json.planIntent === 'sharpen' ? ($json.gates['3'].details.sharpenTask || undefined) : undefined, coverageRevision: $json.planIntent === 'coverage-revision', revisionNote: $json.planIntent === 'coverage-revision' ? ($json.gates['4'].details.revisionNote || undefined) : undefined } }) }}"
       }
     },
     {
@@ -2134,7 +2134,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ action: 'spec-check', requestId: $execution.id + ':spec-check:' + $runIndex, resume: true, payload: {} }) }}"
+        "body": "={{ JSON.stringify({ action: 'spec-check', requestId: 'payflow-' + $execution.id + '-spec-check-' + $runIndex, resume: true, payload: {} }) }}"
       }
     },
     {
@@ -2510,7 +2510,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ action: 'build-task', requestId: $execution.id + ':build-task:' + $runIndex, resume: true, payload: { task: Number($json.task), taskCount: Number($json.taskCount) } }) }}"
+        "body": "={{ JSON.stringify({ action: 'build-task', requestId: 'payflow-' + $execution.id + '-build-task-' + $runIndex, resume: true, payload: { task: Number($json.task), taskCount: Number($json.taskCount) } }) }}"
       }
     },
     {
@@ -3025,7 +3025,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ action: 'build-remaining', requestId: $execution.id + ':build-remaining:' + $runIndex, resume: true, payload: { fromTask: Number($json.gates['5'].details.task) + 1, toTask: Number($json.gates['5'].details.taskCount) } }) }}"
+        "body": "={{ JSON.stringify({ action: 'build-remaining', requestId: 'payflow-' + $execution.id + '-build-remaining-' + $runIndex, resume: true, payload: { fromTask: Number($json.gates['5'].details.task) + 1, toTask: Number($json.gates['5'].details.taskCount) } }) }}"
       }
     },
     {
@@ -3132,7 +3132,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ action: 'verify', requestId: $execution.id + ':verify:' + $runIndex, resume: true, payload: {} }) }}"
+        "body": "={{ JSON.stringify({ action: 'verify', requestId: 'payflow-' + $execution.id + '-verify-' + $runIndex, resume: true, payload: {} }) }}"
       }
     },
     {
@@ -3416,7 +3416,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ action: 'fix-defect', requestId: $execution.id + ':fix-defect:' + $runIndex, resume: true, payload: {} }) }}"
+        "body": "={{ JSON.stringify({ action: 'fix-defect', requestId: 'payflow-' + $execution.id + '-fix-defect-' + $runIndex, resume: true, payload: {} }) }}"
       }
     },
     {
@@ -3523,7 +3523,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ action: 'review', requestId: $execution.id + ':review:' + $runIndex, resume: true, payload: {} }) }}"
+        "body": "={{ JSON.stringify({ action: 'review', requestId: 'payflow-' + $execution.id + '-review-' + $runIndex, resume: true, payload: {} }) }}"
       }
     },
     {
@@ -3662,7 +3662,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ action: 'security-review', requestId: $execution.id + ':security-review:' + $runIndex, resume: true, payload: {} }) }}"
+        "body": "={{ JSON.stringify({ action: 'security-review', requestId: 'payflow-' + $execution.id + '-security-review-' + $runIndex, resume: true, payload: {} }) }}"
       }
     },
     {
@@ -4178,7 +4178,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ action: 'fix-findings', requestId: $execution.id + ':fix-findings:' + $runIndex, resume: true, payload: { selectedFindingIds: $json.gates['7'].details.selectedFindingIds } }) }}"
+        "body": "={{ JSON.stringify({ action: 'fix-findings', requestId: 'payflow-' + $execution.id + '-fix-findings-' + $runIndex, resume: true, payload: { selectedFindingIds: $json.gates['7'].details.selectedFindingIds } }) }}"
       }
     },
     {
@@ -4285,7 +4285,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ action: 'close', requestId: $execution.id + ':close:' + $runIndex, resume: true, payload: {} }) }}"
+        "body": "={{ JSON.stringify({ action: 'close', requestId: 'payflow-' + $execution.id + '-close-' + $runIndex, resume: true, payload: {} }) }}"
       }
     },
     {
@@ -4392,7 +4392,7 @@
         "sendBody": true,
         "contentType": "raw",
         "rawContentType": "application/json",
-        "body": "={{ JSON.stringify({ action: 'final-audit', requestId: $execution.id + ':final-audit:' + $runIndex, resume: true, payload: {} }) }}"
+        "body": "={{ JSON.stringify({ action: 'final-audit', requestId: 'payflow-' + $execution.id + '-final-audit-' + $runIndex, resume: true, payload: {} }) }}"
       }
     },
     {

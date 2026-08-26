@@ -146,3 +146,20 @@ test('the verification meaning is read from the real verify.sh', async () => {
   assert.equal(described.runsSuites, false);
   assert.equal(await describeVerifyScript('/nonexistent-path'), null);
 });
+
+test('every reporting action asks for its table verbatim', () => {
+  // A Claude main agent summarizes its subagent by default. A summary drops the tables that
+  // gate 4 and gate 7 must show and that parseFindings reads.
+  for (const engine of [codex, claude]) {
+    for (const action of ['spec-check', 'verify', 'review', 'security-review']) {
+      const prompt = runner(engine).promptFor(run(), action, {});
+
+      assert.match(prompt, /verbatim, exactly as the subagent wrote them/, `${engine.id}/${action}`);
+      assert.match(prompt, /Do not summarize them/, `${engine.id}/${action}`);
+    }
+  }
+
+  assert.match(runner(codex).promptFor(run(), 'spec-check', {}), /coverage table, the numbered gap list, and the verdict/);
+  assert.match(runner(codex).promptFor(run(), 'review', {}), /severity, file:line, finding, and remediation/);
+  assert.match(runner(codex).promptFor(run(), 'verify', {}), /criterion-to-test table and the final verify\.sh result line/);
+});

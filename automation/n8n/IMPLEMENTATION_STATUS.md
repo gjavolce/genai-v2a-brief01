@@ -165,16 +165,63 @@ This defect predates this pass. It means no real run could ever have completed.
 import. An import writes `active=false` from the file, and n8n registers the form
 webhook only at start-up, so a re-import used to leave the form returning 404.
 
+## Real runs
+
+`npm run smoke:real` ran on both engines against Task 01. The smoke clones the
+repository, applies preflight `use-current`, runs only the read-only
+`spec-guardian`, and asserts that the clone did not change. Both passed.
+
+| | codex | claude |
+|---|---|---|
+| Model | `gpt-5.6-sol` | `sonnet` |
+| Duration | 2 min 15 s | 3 min 16 s |
+| Session ID captured exactly | yes | yes |
+| `missingSkills` at preflight | none | none |
+| Ownership violations | none | none |
+| Forbidden Git commands | none | none |
+| Clone digest after the run | unchanged | unchanged |
+| Verdict | NO-GO, 12 criteria | NO-GO, 12 criteria |
+
+GitHub became unreachable during this work. `PAYFLOW_REMOTE_URL` accepts a local
+path, because the runner clones with `git clone --no-local`. The Claude run used
+the local repository and produced a real, independent clone with no network
+access.
+
+### Three defects that only a real run found
+
+1. **A NO-GO usually marks every criterion covered.** The real spec guardian
+   reported all twelve criteria as covered and stated the gaps as a numbered
+   prose list about vague steps and scope. The revision prompt looked only for
+   rows marked `GAP` and refused to build a prompt when it found none, so a
+   Gate 4 `revise-plan` would have failed on the common case. `spec-check`
+   evidence now also records the numbered gap list and the full report, and the
+   revision prompt uses whichever exists.
+
+2. **The Claude engine summarized its subagent.** The main agent returned prose
+   instead of the coverage table, so the run recorded zero criterion IDs. Gate 4
+   must show each uncovered criterion ID, and `parseFindings` reads the findings
+   table, so a summary breaks both. `spec-check`, `verify`, `review`, and
+   `security-review` now instruct the agent to return the table verbatim. The
+   repeated run recovered all twelve criterion IDs.
+
+3. **The verdict parser was too strict.** It matched only a bare `**NO-GO**`.
+   The Claude agent wrote `**Verdict: NO-GO**`, which produced `verdict: null`
+   and would have blanked Gate 4. `parseVerdict` now scans from the end of the
+   report and accepts the wrappers real agents write.
+
+`npm run smoke:real` now asserts the verdict, the criterion IDs, and that a
+NO-GO carries gaps. The real output of both engines is checked in under
+`test/fixtures/` as a regression test.
+
 ## Not verified
 
-1. The Claude engine has never executed a real action. Its flags come from
-   `claude -h` on version 2.1.231 and its argument building is unit-tested, but
-   no `claude -p` process has run through the runner. Use
-   `PAYFLOW_ENGINE=claude npm run smoke:real` first. That smoke is read-only.
-2. The Header Auth credential path is generated and validated but was not
+1. The Header Auth credential path is generated and validated but was not
    imported into the live instance.
-3. The opt-in Task 01 real smoke has not run on either engine. No real action
-   has run on any engine.
+2. No write action has run for real on either engine. Only the read-only
+   `spec-guardian` has executed. `implementer`, `test-verifier`, `code-reviewer`,
+   and `feature-close` have run in demo mode only.
+3. The Claude engine has not been driven through the n8n canvas. The live canvas
+   traversals used demo mode, and the real runs used the runner API directly.
 
 ## Known limits
 

@@ -22,9 +22,19 @@ try {
   const threadId = lines.map((line) => config.engine.parseEvent(line)).find((event) => event.sessionId)?.sessionId;
   const refreshed = await request('GET', `/v1/runs/${run.id}`);
   if (!threadId || threadId !== job.threadId || refreshed.sessions['spec-check'] !== threadId) {
-    throw new Error('Codex session ID was not captured exactly');
+    throw new Error('the engine session ID was not captured exactly');
   }
-  process.stdout.write(`Real smoke passed on engine ${config.engine.id}.\nRun: ${run.id}\nClone: ${run.repoPath}\nJob: ${job.id}\nSession: ${threadId}\nJSONL: ${jsonlPath}\n`);
+  // A summarized or unparsed report would blank gate 4. Assert the evidence, not just the exit code.
+  if (!['GO', 'NO-GO'].includes(job.evidence.verdict)) {
+    throw new Error(`the spec-check verdict did not parse: ${JSON.stringify(job.evidence.verdict)}`);
+  }
+  if (!job.evidence.criterionIds.length) {
+    throw new Error('the spec-check report carried no criterion IDs; the coverage table was lost');
+  }
+  if (job.evidence.verdict === 'NO-GO' && !job.evidence.reasons.length && !job.evidence.gapLines.length) {
+    throw new Error('a NO-GO recorded no gaps, so a revision would have nothing to act on');
+  }
+  process.stdout.write(`Real smoke passed on engine ${config.engine.id}.\nVerdict: ${job.evidence.verdict} (${job.evidence.criterionIds.length} criteria, ${job.evidence.reasons.length} gaps)\nRun: ${run.id}\nClone: ${run.repoPath}\nJob: ${job.id}\nSession: ${threadId}\nJSONL: ${jsonlPath}\n`);
 } finally {
   if (run?.id) await request('POST', `/v1/runs/${run.id}/stop`, { reason: 'Task 01 read-only smoke completed' }).catch(() => {});
 }

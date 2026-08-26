@@ -148,6 +148,11 @@ automatic attempt.
 
 ## Real runs and retained state
 
+`PAYFLOW_REMOTE_URL` may be a local path as well as a URL. The runner clones with
+`git clone --no-local`, so a path such as `/Users/you/repos/genai-v2a-brief01`
+produces a real, independent clone with no network access. Use that to verify the
+kit offline. Committed work only: the clone never sees your uncommitted changes.
+
 A real run clones the configured remote at `origin/main` by default. Entering a
 different validated base ref requires explicit acknowledgement at preflight.
 Only one real run may be active because PayFlow verification uses fixed local

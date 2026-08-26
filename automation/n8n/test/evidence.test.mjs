@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { ActionRunner } from '../runner/action-runner.mjs';
 import codex from '../runner/engines/codex.mjs';
+import { InputError, parseVerdict } from '../runner/lib.mjs';
 
 const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const runner = new ActionRunner({ store: null, engine: codex, engineBin: 'unused', model: 'm', fixturePath: 'unused' });
@@ -106,4 +108,69 @@ test('a GO verdict reports no uncovered criteria', async () => {
   const evidence = await runner.normalizeEvidence(run, 'spec-check', message, [], {});
 
   assert.deepEqual(evidence.uncoveredCriteria, []);
+});
+
+test('a real NO-GO with every criterion covered still yields a usable revision', async () => {
+  // Captured from a real spec-guardian run on Task 01. It marks all twelve criteria
+  // covered and states the gaps as a numbered list, so no row carries a GAP marker.
+  const message = readFileSync(new URL('./fixtures/spec-guardian-no-go.md', import.meta.url), 'utf8');
+
+  const evidence = await runner.normalizeEvidence(run, 'spec-check', message, [], {});
+
+  assert.equal(evidence.verdict, 'NO-GO');
+  assert.deepEqual(evidence.uncoveredCriteria, []);
+  assert.equal(evidence.reasons.length, 2);
+  assert.match(evidence.reasons[0], /Steps 1, 2, and 8 are vague/);
+
+  const revising = { ...run, coverage: { ...evidence, report: message } };
+  const prompt = runner.promptFor(revising, 'plan', { coverageRevision: true });
+
+  assert.match(prompt, /Steps 1, 2, and 8 are vague/);
+  assert.match(prompt, /Do not write code/);
+});
+
+test('a revision falls back to the whole report when the agent lists no numbered gaps', () => {
+  const report = 'The plan omits the audit record required for a state change.\n\n**NO-GO**';
+  const revising = { ...run, coverage: { uncoveredCriteria: [], gapLines: [], reasons: [], report } };
+
+  const prompt = runner.promptFor(revising, 'plan', { coverageRevision: true });
+
+  assert.match(prompt, /Spec guardian report:/);
+  assert.match(prompt, /omits the audit record/);
+});
+
+test('a revision is refused only when no spec check has run at all', () => {
+  const bare = { ...run, coverage: { uncoveredCriteria: [], gapLines: [], reasons: [], report: '' } };
+
+  assert.throws(() => runner.promptFor(bare, 'plan', { coverageRevision: true }), InputError);
+});
+
+test('the verdict survives the wrappers real agents actually write', () => {
+  const cases = [
+    ['**NO-GO** — identify concrete implementation targets.', 'NO-GO'],
+    ['**Verdict: NO-GO**', 'NO-GO'],
+    ['## NO GO', 'NO-GO'],
+    ['**GO**', 'GO'],
+    ['**Verdict: GO**', 'GO'],
+    ['## GO', 'GO'],
+    ['| AC-01-1.1 | Step 3 | covered |', null],
+    ['The plan is fine.', null],
+  ];
+
+  for (const [line, expected] of cases) {
+    assert.equal(parseVerdict(`| a | b |\n\n${line}`), expected, JSON.stringify(line));
+  }
+});
+
+test('both real spec-guardian outputs parse to NO-GO with their gaps intact', async () => {
+  for (const name of ['spec-guardian-no-go.md', 'spec-guardian-no-go-claude.md']) {
+    const message = readFileSync(new URL(`./fixtures/${name}`, import.meta.url), 'utf8');
+
+    const evidence = await runner.normalizeEvidence(run, 'spec-check', message, [], {});
+
+    assert.equal(evidence.verdict, 'NO-GO', name);
+    assert.equal(evidence.criterionIds.length, 12, name);
+    assert(evidence.reasons.length >= 2, name);
+    assert.match(runner.promptFor({ ...run, coverage: evidence }, 'plan', { coverageRevision: true }), /Do not write code/);
+  }
 });

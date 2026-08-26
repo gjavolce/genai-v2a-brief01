@@ -311,9 +311,22 @@ export async function describeVerifyScript(repoPath) {
   return { steps, runsSuites: /mvnw\s+test|npm\s+(?:run\s+)?test/.test(content) };
 }
 
+// Agents vary the wrapper: `**NO-GO**`, `**Verdict: NO-GO**`, `## GO`. Matching only the
+// bare bold form returned null and silently blanked gate 4. Scan from the end, where the
+// contract puts the verdict, and prefer NO-GO.
+export function parseVerdict(message) {
+  const lines = message.split('\n').map((line) => line.trim()).filter(Boolean);
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = lines[index];
+    if (/\bNO[-\s]?GO\b/i.test(line)) return 'NO-GO';
+    if (/\bGO\b/.test(line) && /\*\*|^#|verdict/i.test(line)) return 'GO';
+  }
+  return null;
+}
+
 export function evidenceFromMessage(action, message, extra = {}) {
   const criterionIds = [...new Set(message.match(/AC-\d{2}-\d+\.\d+/g) ?? [])];
-  const verdict = /\*\*NO-GO\*\*/.test(message) ? 'NO-GO' : /\*\*GO\*\*/.test(message) ? 'GO' : null;
+  const verdict = parseVerdict(message);
   const verifyLine = message.split('\n').findLast?.((line) => /(?:✅ All green\.|❌ Fix the above)/.test(line)) ?? null;
   return { action, criterionIds, verdict, verifyLine, raw: message, ...extra };
 }

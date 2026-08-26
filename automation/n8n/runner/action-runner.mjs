@@ -90,6 +90,8 @@ export class ActionRunner {
           verdict: result.evidence?.verdict ?? null,
           uncoveredCriteria: result.evidence?.uncoveredCriteria ?? [],
           gapLines: result.evidence?.gapLines ?? [],
+          reasons: result.evidence?.reasons ?? [],
+          report: String(result.evidence?.raw ?? job.finalMessage ?? '').slice(0, 4000),
         };
       }
       if (job.action === 'review') {
@@ -298,7 +300,10 @@ export class ActionRunner {
         }
         return `Use ${this.engine.plannerAgent} with exactly:\n\nPlan the work in docs/features/${nn}/${nn}-plan-request.md\n\nIf the planner asks a question, return it. Do not answer it. If the planner returns a plan, invoke ${writePlan}.`;
       }
-      case 'spec-check': return `Use the spec-guardian subagent to check docs/features/${nn}/${nn}-plan.md against docs/features/${nn}/${nn}-acceptance.md`;
+      case 'spec-check': return verbatim(
+        `Use the spec-guardian subagent to check docs/features/${nn}/${nn}-plan.md against docs/features/${nn}/${nn}-acceptance.md`,
+        'the coverage table, the numbered gap list, and the verdict',
+      );
       case 'build-task': return `Use the implementer subagent to build task ${validateTaskIndex(payload.task)} of docs/features/${nn}/${nn}-plan.md`;
       case 'build-remaining': {
         const fromTask = validateTaskIndex(payload.fromTask, 'fromTask');
@@ -306,9 +311,18 @@ export class ActionRunner {
         if (fromTask > toTask) throw new InputError('fromTask must not be greater than toTask');
         return `The human waived the remaining gate-5 checks. Use the implementer subagent to build tasks ${fromTask} through ${toTask} of docs/features/${nn}/${nn}-plan.md in plan order.`;
       }
-      case 'verify': return `Use the test-verifier subagent to verify task ${nn}`;
-      case 'review': return `Use the code-reviewer subagent to review the diff for task ${nn}`;
-      case 'security-review': return `Use the security-reviewer subagent to review the diff for task ${nn}`;
+      case 'verify': return verbatim(
+        `Use the test-verifier subagent to verify task ${nn}`,
+        'the criterion-to-test table and the final verify.sh result line',
+      );
+      case 'review': return verbatim(
+        `Use the code-reviewer subagent to review the diff for task ${nn}`,
+        'the findings table, with its severity, file:line, finding, and remediation columns',
+      );
+      case 'security-review': return verbatim(
+        `Use the security-reviewer subagent to review the diff for task ${nn}`,
+        'the findings table, with its severity, file:line, finding, and remediation columns',
+      );
       case 'fix-defect': {
         const details = run.gates['6']?.details ?? {};
         const defect = [details.productionDefect, details.evidenceRaw]
@@ -341,12 +355,18 @@ export class ActionRunner {
     const coverage = run.coverage ?? {};
     const uncovered = (coverage.uncoveredCriteria ?? []).join(', ');
     const gaps = (coverage.gapLines ?? []).join('\n');
-    if (!uncovered && !gaps) throw new InputError('No spec-guardian coverage gaps are recorded for this run');
+    const reasons = (coverage.reasons ?? []).join('\n');
+    const report = coverage.report ?? '';
+    if (!uncovered && !gaps && !reasons && !report) {
+      throw new InputError('No spec-guardian coverage report is recorded for this run');
+    }
     const note = revisionNote(payload);
     return [
       `The spec guardian returned NO-GO for docs/features/${nn}/${nn}-plan.md.`,
       uncovered ? `Uncovered criteria: ${uncovered}` : null,
-      gaps ? `Reported gaps:\n${gaps}` : null,
+      gaps ? `Rows marked as a gap:\n${gaps}` : null,
+      reasons ? `Reported gaps and scope items:\n${reasons}` : null,
+      !gaps && !reasons && report ? `Spec guardian report:\n${report}` : null,
       note ? `The human added this instruction: ${note}` : null,
       `Revise docs/features/${nn}/${nn}-plan.md to close the gaps above. Do not write code. Then invoke ${this.engine.skill('feature-plan', nn)}.`,
     ].filter(Boolean).join('\n\n');
@@ -368,9 +388,14 @@ export class ActionRunner {
       };
     }
     if (action === 'spec-check') {
-      const gapLines = message.split('\n').filter((line) => /GAP/.test(line));
+      const lines = message.split('\n');
+      const gapLines = lines.filter((line) => /GAP|\u274c/.test(line));
       const uncoveredCriteria = [...new Set(gapLines.flatMap((line) => line.match(/AC-\d{2}-\d+\.\d+/g) ?? []))];
-      return { ...base, uncoveredCriteria: base.verdict === 'NO-GO' ? uncoveredCriteria : [], gapLines };
+      // A real NO-GO often marks every criterion covered and states the gaps as a numbered
+      // list of vague tasks or scope items. Capture that list too, or a revision has nothing
+      // to act on.
+      const reasons = lines.filter((line) => /^\s*\d+[.)]\s+\S/.test(line)).map((line) => line.trim());
+      return { ...base, uncoveredCriteria: base.verdict === 'NO-GO' ? uncoveredCriteria : [], gapLines, reasons };
     }
     if (action === 'build-task' || action === 'build-remaining') {
       const diff = await git(run.repoPath, ['diff', '--stat']);
@@ -462,6 +487,12 @@ export class ActionRunner {
     result.raw = result.passed ? 'Final audit passed.' : result.failures.join('\n');
     return result;
   }
+}
+
+// A Claude main agent summarizes what its subagent returned. A summary drops the tables
+// that gate 4 and gate 7 must show and that parseFindings reads, so ask for them verbatim.
+function verbatim(invocation, what) {
+  return `${invocation}\n\nReturn ${what} verbatim, exactly as the subagent wrote them. Do not summarize them and do not rewrite them.`;
 }
 
 export function revisionNote(payload) {

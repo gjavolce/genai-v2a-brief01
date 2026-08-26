@@ -1,0 +1,21 @@
+{
+  "name": "payflow-n8n-orchestrator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "generate:workflows": "node scripts/generate-workflows.mjs",
+    "runner": "node runner/server.mjs",
+    "status": "node runner/cli.mjs status",
+    "cleanup": "node runner/cli.mjs cleanup",
+    "smoke:real": "node scripts/real-smoke.mjs",
+    "smoke:n8n-demo": "node scripts/n8n-demo-smoke.mjs",
+    "validate:workflows": "node scripts/validate-workflows.mjs",
+    "test": "node --test test/*.test.mjs",
+    "smoke:n8n-failure": "N8N_DEMO_SCENARIO=repeated-failure node scripts/n8n-demo-smoke.mjs",
+    "smoke:n8n-revision": "N8N_DEMO_SCENARIO=no-go-revision node scripts/n8n-demo-smoke.mjs"
+  }
+}

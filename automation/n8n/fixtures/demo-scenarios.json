@@ -1,0 +1,94 @@
+{
+  "happy-path": {
+    "acceptance": {
+      "summary": "3 FRs, 8 criteria, 2 open questions.",
+      "openQuestions": ["Choose the duplicate-submission result.", "Choose the largest permitted amount."],
+      "raw": "docs/features/04/04-acceptance.md\n3 FRs, 8 criteria, 2 open questions."
+    },
+    "adr": {
+      "summary": "4 decisions made, 1 referenced, 4 NFRs written, 0 gaps found.",
+      "gaps": [],
+      "raw": "docs/features/04/04-adr.md\n4 decisions made, 1 referenced, 4 NFRs written, 0 gaps found."
+    },
+    "kickoff": {
+      "interpretations": [],
+      "untestableCriteria": [],
+      "raw": "docs/features/04/04-plan-request.md"
+    },
+    "plan": {
+      "taskCount": 3,
+      "taskTitles": ["Add the transfer migration", "Implement the transfer API", "Add the transfer page and tests"],
+      "vaguestTask": 3,
+      "raw": "1. Add the transfer migration.\n2. Implement the transfer API.\n3. Add the transfer page and tests."
+    },
+    "spec-check": {
+      "verdict": "GO",
+      "criterionIds": ["AC-04-1.1", "AC-04-1.2", "AC-04-2.1"],
+      "uncoveredCriteria": [],
+      "gapLines": [],
+      "raw": "| Criterion | Covered by | Status |\n|---|---|---|\n| AC-04-1.1 | Task 2 | ✅ |\n\n**GO**"
+    },
+    "build-task": {
+      "diffStat": "3 files changed, 42 insertions(+)",
+      "raw": "- Task completed.\n- Changed the planned files only."
+    },
+    "build-remaining": {
+      "diffStat": "12 files changed, 318 insertions(+), 8 deletions(-)",
+      "raw": "- Remaining tasks completed in plan order."
+    },
+    "verify": {
+      "criterionIds": ["AC-04-1.1", "AC-04-1.2", "AC-04-2.1"],
+      "verifyLine": "✅ All green.",
+      "suitesExecuted": true,
+      "verificationMeaning": "verify.sh checked: Docker; CLAUDE.md; Subagents; Commands; docker compose up; Backend healthy; GET /api/customers. verify.sh does not run the unit test suites. Green means the stack started and the smoke test passed. It does not mean that the test suites passed. In this job the API suite ran and the web suite ran.",
+      "verificationMeaningRecorded": true,
+      "raw": "| Criterion | Test | Before | After |\n|---|---|---|---|\n| AC-04-1.1 | shouldTransferFunds | exists | passes |\n\n✅ All green."
+    },
+    "review": {
+      "securityReviewer": "missing",
+      "raw": "| Severity | File:line | Finding | Remediation |\n|---|---|---|---|\n| MEDIUM | TransferService.java:42 | Demo finding | Use the established mapper |"
+    },
+    "security-review": {
+      "raw": "NO FINDINGS"
+    },
+    "fix-findings": {
+      "raw": "- Fixed the selected demo findings.\n- Changed nothing else."
+    },
+    "close": {
+      "raw": "docs/features/04/04-PR.md\nSuggested commands:\ngit add -A\ngit commit -m \"feat(04): internal transfer\"\ngit push -u origin feature/04-internal-transfer\ngh pr create --fill"
+    }
+  },
+  "no-go-revision": {
+    "spec-check": {
+      "verdict": "NO-GO",
+      "criterionIds": ["AC-04-1.1", "AC-04-1.2"],
+      "uncoveredCriteria": ["AC-04-1.2"],
+      "gapLines": ["| AC-04-1.2 | — | ❌ GAP |"],
+      "raw": "| Criterion | Covered by | Status |\n|---|---|---|\n| AC-04-1.2 | — | ❌ GAP |\n\n**NO-GO**"
+    }
+  },
+  "planner-question": {
+    "plan": {
+      "needsInput": true,
+      "question": "Must a repeated transfer return the original result or be refused?",
+      "raw": "Must a repeated transfer return the original result or be refused?"
+    }
+  },
+  "production-defect": {
+    "verify": {
+      "criterionIds": ["AC-04-1.1"],
+      "verifyLine": "❌ TransferService returns the wrong balance.",
+      "productionDefect": true,
+      "suitesExecuted": true,
+      "verificationMeaning": "The API test suite found a production defect. verify.sh was not treated as full green.",
+      "verificationMeaningRecorded": false,
+      "raw": "Production defect: TransferService returns the wrong balance."
+    }
+  },
+  "repeated-failure": {
+    "acceptance": {
+      "forceFailure": true,
+      "raw": "Demo failure: acceptance generation failed in the same way."
+    }
+  }
+}

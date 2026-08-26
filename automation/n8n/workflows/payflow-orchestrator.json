@@ -1,0 +1,6126 @@
+{
+  "id": "payflow-feature-orchestrator",
+  "name": "PayFlow Feature Orchestrator",
+  "active": false,
+  "nodes": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "name": "Start or Resume PayFlow",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "authentication": "n8nUserAuth",
+        "requireExecuteAccess": false,
+        "formTitle": "Local PayFlow Orchestrator",
+        "formDescription": "Start a fresh isolated run, start a deterministic demo, or resume a retained run by ID.",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "operation",
+              "fieldLabel": "Operation",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "new-real"
+                  },
+                  {
+                    "option": "new-demo"
+                  },
+                  {
+                    "option": "resume"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldName": "taskNumber",
+              "fieldLabel": "Two-digit task number",
+              "fieldType": "text",
+              "requiredField": false,
+              "defaultValue": "01"
+            },
+            {
+              "fieldName": "baseRef",
+              "fieldLabel": "Base ref",
+              "fieldType": "text",
+              "requiredField": false,
+              "defaultValue": "origin/main"
+            },
+            {
+              "fieldName": "runId",
+              "fieldLabel": "Retained run ID for resume",
+              "fieldType": "text",
+              "requiredField": false
+            },
+            {
+              "fieldName": "demoScenario",
+              "fieldLabel": "Demo scenario",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "happy-path"
+                  },
+                  {
+                    "option": "planner-question"
+                  },
+                  {
+                    "option": "no-go-revision"
+                  },
+                  {
+                    "option": "gate-5-waiver"
+                  },
+                  {
+                    "option": "production-defect"
+                  },
+                  {
+                    "option": "missing-security-reviewer"
+                  },
+                  {
+                    "option": "selected-findings"
+                  },
+                  {
+                    "option": "repeated-failure"
+                  }
+                ]
+              },
+              "requiredField": false
+            }
+          ]
+        },
+        "options": {
+          "path": "payflow",
+          "buttonLabel": "Open run",
+          "useWorkflowTimezone": true
+        }
+      },
+      "webhookId": "40000000-0000-4000-8000-000000000001"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "name": "Action Failed — Resume Or Stop",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.6,
+      "position": [
+        1160,
+        760
+      ],
+      "parameters": {
+        "operation": "page",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "failureDecision",
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "retry-phase"
+                  },
+                  {
+                    "option": "stop"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldName": "runId",
+              "fieldLabel": "Run ID",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.runId || $json.id || \"\" }}"
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "Action failed",
+          "formDescription": "Action <b>{{ $json.action }}</b> ended as <b>{{ $json.status }}</b>.<br><b>Clone:</b> {{ $json.clonePath || '(demo mode: no clone)' }}<br><pre>{{ $json.error }}</pre>A <b>blocked</b> run already failed twice in the same way. It accepts no further action, so choose stop.",
+          "buttonLabel": "Continue"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "name": "Route Action Failure",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        1400,
+        760
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.failureDecision }}",
+                    "rightValue": "retry-phase",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "retry-phase"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.failureDecision }}",
+                    "rightValue": "stop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "stop"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "name": "Reload Run After Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1640,
+        700
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + $json.runId + '' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "name": "Runner Unreachable — Execution Halted",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.6,
+      "position": [
+        1400,
+        940
+      ],
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "The host runner could not be reached",
+        "completionMessage": "=The job could not be polled. Read automation/n8n/runner.log, run automation/n8n/bin/status.sh, then resume this run by ID from the start form. The retained run and its clone are untouched.",
+        "options": {
+          "formTitle": "PayFlow runner unreachable"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000006",
+      "name": "Route Start Mode",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.operation }}",
+                    "rightValue": "new-real",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "new-real"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.operation }}",
+                    "rightValue": "new-demo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "new-demo"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.operation }}",
+                    "rightValue": "resume",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "resume"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000007",
+      "name": "Create Real Run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        -220
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ taskNumber: $json.taskNumber, mode: 'real', baseRef: $json.baseRef || 'origin/main' }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000008",
+      "name": "Create Demo Run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ taskNumber: $json.taskNumber || '04', mode: 'demo', baseRef: $json.baseRef || 'origin/main', demoScenario: $json.demoScenario || 'happy-path' }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000009",
+      "name": "Load Retained Run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        220
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + $json.runId + '' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000010",
+      "name": "Canonical Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        0
+      ],
+      "parameters": {
+        "jsCode": "return $input.all();"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000011",
+      "name": "Is Resumed Run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        920,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $(\"Start or Resume PayFlow\").first().json.operation }}",
+              "rightValue": "resume",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000012",
+      "name": "Preflight — Branch Decision",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.6,
+      "position": [
+        1160,
+        -180
+      ],
+      "parameters": {
+        "operation": "page",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "decision",
+              "fieldLabel": "Branch decision",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "create-task-branch"
+                  },
+                  {
+                    "option": "use-current"
+                  },
+                  {
+                    "option": "stop"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldName": "baseDeviationAcknowledged",
+              "fieldLabel": "Acknowledge a base other than origin/main",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "false"
+                  },
+                  {
+                    "option": "true"
+                  }
+                ]
+              },
+              "requiredField": false
+            },
+            {
+              "fieldName": "overwriteExistingArtifacts",
+              "fieldLabel": "Permit updates to existing workflow-owned artifacts",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "false"
+                  },
+                  {
+                    "option": "true"
+                  }
+                ]
+              },
+              "requiredField": false
+            },
+            {
+              "fieldName": "runId",
+              "fieldLabel": "Run ID",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.runId || $json.id || \"\" }}"
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "Preflight — Branch decision",
+          "formDescription": "Task: <b>{{ $json.taskNumber }}</b><br>Expected branch: <b>{{ $json.expectedBranch }}</b><br>Note: {{ $json.taskNote || 'none' }}<br>Missing authoring skills: <b>{{ ($json.missingSkills || []).map(skill => skill.path).join(', ') || 'none' }}</b> — Task 00 writes them, and this workflow refuses to start without them.<br>Artifacts: <pre>{{ JSON.stringify($json.artifacts, null, 2) }}</pre><b>Clone:</b> {{ $json.repoPath || '(demo mode: no clone)' }}",
+          "buttonLabel": "Apply branch decision"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000013",
+      "name": "Preflight — Start",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1400,
+        -180
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '/actions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ action: 'branch', requestId: $execution.id + ':branch:' + $runIndex, resume: true, payload: { decision: $json.decision, baseDeviationAcknowledged: String($json.baseDeviationAcknowledged) === 'true', overwriteExistingArtifacts: String($json.overwriteExistingArtifacts) === 'true' } }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000014",
+      "name": "Preflight — Poll",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1620,
+        -180
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "payflow-poll-job",
+          "mode": "list",
+          "cachedResultName": "PayFlow Poll Job"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobId": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "jobId"
+          ],
+          "schema": [
+            {
+              "id": "jobId",
+              "displayName": "jobId",
+              "required": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000015",
+      "name": "Preflight — Job Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1620,
+        -10
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000016",
+      "name": "Route Preflight Decision",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        1840,
+        -700
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.evidence.decision }}",
+                    "rightValue": "create-task-branch",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "create-task-branch"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.evidence.decision }}",
+                    "rightValue": "use-current",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "use-current"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.evidence.decision }}",
+                    "rightValue": "stop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "stop"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000017",
+      "name": "Resume — Choose Next Phase",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.6,
+      "position": [
+        1160,
+        180
+      ],
+      "parameters": {
+        "operation": "page",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "resumePhase",
+              "fieldLabel": "Next phase",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "acceptance"
+                  },
+                  {
+                    "option": "adr"
+                  },
+                  {
+                    "option": "kickoff"
+                  },
+                  {
+                    "option": "plan"
+                  },
+                  {
+                    "option": "spec-check"
+                  },
+                  {
+                    "option": "build"
+                  },
+                  {
+                    "option": "verify"
+                  },
+                  {
+                    "option": "review"
+                  },
+                  {
+                    "option": "close"
+                  },
+                  {
+                    "option": "stop"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldName": "resumeArtifactConsent",
+              "fieldLabel": "Artifact consent",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "true"
+            },
+            {
+              "fieldName": "runId",
+              "fieldLabel": "Run ID",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.runId || $json.id || \"\" }}"
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "Resume retained run",
+          "formDescription": "Status: <b>{{ $json.status }}</b>; recorded phase: <b>{{ $json.currentPhase }}</b><br>Human-edited artifacts: {{ ($json.humanEditedArtifacts || []).join(', ') || 'none detected' }}<br><b>Clone:</b> {{ $json.repoPath || '(demo mode: no clone)' }}<br><br>Selecting a workflow-owned artifact phase is explicit consent to update that artifact while preserving other human edits.",
+          "buttonLabel": "Resume"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000018",
+      "name": "Route Resume Phase",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        1400,
+        180
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.resumePhase }}",
+                    "rightValue": "acceptance",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "acceptance"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.resumePhase }}",
+                    "rightValue": "adr",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "adr"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.resumePhase }}",
+                    "rightValue": "kickoff",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "kickoff"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.resumePhase }}",
+                    "rightValue": "plan",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "plan"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.resumePhase }}",
+                    "rightValue": "spec-check",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "spec-check"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.resumePhase }}",
+                    "rightValue": "build",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "build"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.resumePhase }}",
+                    "rightValue": "verify",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "verify"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.resumePhase }}",
+                    "rightValue": "review",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "review"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.resumePhase }}",
+                    "rightValue": "close",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "close"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.resumePhase }}",
+                    "rightValue": "stop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "stop"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000019",
+      "name": "Phase 1 Acceptance — Start",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        -540
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '/actions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ action: 'acceptance', requestId: $execution.id + ':acceptance:' + $runIndex, resume: true, payload: { overwriteArtifact: String($json.resumeArtifactConsent) === 'true' || $json.gates?.['1']?.decision === 'revise' || $json.artifactOverwriteAcknowledged === true || $json.evidence?.artifactOverwriteAcknowledged === true, revisionNote: $json.gates?.['1']?.decision === 'revise' ? ($json.gates['1'].details.revisionNote || undefined) : undefined } }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000020",
+      "name": "Phase 1 Acceptance — Poll",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        1980,
+        -540
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "payflow-poll-job",
+          "mode": "list",
+          "cachedResultName": "PayFlow Poll Job"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobId": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "jobId"
+          ],
+          "schema": [
+            {
+              "id": "jobId",
+              "displayName": "jobId",
+              "required": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000021",
+      "name": "Phase 1 Acceptance — Job Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1980,
+        -370
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000022",
+      "name": "Acceptance — Human Gate 1",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.6,
+      "position": [
+        2200,
+        -540
+      ],
+      "parameters": {
+        "operation": "page",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "decision",
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "accept"
+                  },
+                  {
+                    "option": "revise"
+                  },
+                  {
+                    "option": "stop"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldName": "revisionNote",
+              "fieldLabel": "If you chose to revise, say what must change",
+              "fieldType": "textarea",
+              "requiredField": false
+            },
+            {
+              "fieldName": "evidenceRaw",
+              "fieldLabel": "Evidence",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ JSON.stringify($json.evidence || $json) }}"
+            },
+            {
+              "fieldName": "runId",
+              "fieldLabel": "Run ID",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.runId || $json.id || \"\" }}"
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "Acceptance — Gate 1",
+          "formDescription": "Confirm that every criterion is concrete and testable. Review the criteria counts and open questions.<br>Task note: <i>{{ $json.taskNote || 'none' }}</i><br><br><b>Clone:</b> {{ $json.clonePath || $json.repoPath || '(demo mode: no clone)' }}<br><pre>{{ JSON.stringify($json.evidence || $json, null, 2) }}</pre>",
+          "buttonLabel": "Record decision"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000023",
+      "name": "Acceptance — Record Gate 1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2420,
+        -540
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + $json.runId + '/gates/1' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ decision: $json.decision, details: { revisionNote: $json.revisionNote || undefined, productionDefect: $json.productionDefect || undefined, sharpenTask: $json.sharpenTask || undefined, task: $json.task || undefined, taskCount: $json.taskCount || undefined, evidenceRaw: $json.evidenceRaw || undefined } }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000024",
+      "name": "Route Gate 1",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        2460,
+        -540
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"1\"].decision }}",
+                    "rightValue": "accept",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "accept"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"1\"].decision }}",
+                    "rightValue": "revise",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "revise"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"1\"].decision }}",
+                    "rightValue": "stop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "stop"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000025",
+      "name": "Phase 2 ADR — Start",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2680,
+        -460
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '/actions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ action: 'adr', requestId: $execution.id + ':adr:' + $runIndex, resume: true, payload: { overwriteArtifact: String($json.resumeArtifactConsent) === 'true' || $json.gates?.['2']?.decision === 'revise' || $json.artifactOverwriteAcknowledged === true, revisionNote: $json.gates?.['2']?.decision === 'revise' ? ($json.gates['2'].details.revisionNote || undefined) : undefined } }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000026",
+      "name": "Phase 2 ADR — Poll",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2900,
+        -460
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "payflow-poll-job",
+          "mode": "list",
+          "cachedResultName": "PayFlow Poll Job"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobId": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "jobId"
+          ],
+          "schema": [
+            {
+              "id": "jobId",
+              "displayName": "jobId",
+              "required": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000027",
+      "name": "Phase 2 ADR — Job Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2900,
+        -290
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000028",
+      "name": "ADR — Human Gate 2",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.6,
+      "position": [
+        3120,
+        -460
+      ],
+      "parameters": {
+        "operation": "page",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "decision",
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "accept"
+                  },
+                  {
+                    "option": "revise"
+                  },
+                  {
+                    "option": "stop"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldName": "revisionNote",
+              "fieldLabel": "If you chose to revise, say what must change",
+              "fieldType": "textarea",
+              "requiredField": false
+            },
+            {
+              "fieldName": "evidenceRaw",
+              "fieldLabel": "Evidence",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ JSON.stringify($json.evidence || $json) }}"
+            },
+            {
+              "fieldName": "runId",
+              "fieldLabel": "Run ID",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.runId || $json.id || \"\" }}"
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "ADR — Gate 2",
+          "formDescription": "Accept the decisions, gaps, non-functional requirements, and code implications.<br><br><b>Clone:</b> {{ $json.clonePath || $json.repoPath || '(demo mode: no clone)' }}<br><pre>{{ JSON.stringify($json.evidence || $json, null, 2) }}</pre>",
+          "buttonLabel": "Record decision"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000029",
+      "name": "ADR — Record Gate 2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3340,
+        -460
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + $json.runId + '/gates/2' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ decision: $json.decision, details: { revisionNote: $json.revisionNote || undefined, productionDefect: $json.productionDefect || undefined, sharpenTask: $json.sharpenTask || undefined, task: $json.task || undefined, taskCount: $json.taskCount || undefined, evidenceRaw: $json.evidenceRaw || undefined } }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000030",
+      "name": "Route Gate 2",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        3380,
+        -460
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"2\"].decision }}",
+                    "rightValue": "accept",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "accept"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"2\"].decision }}",
+                    "rightValue": "revise",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "revise"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"2\"].decision }}",
+                    "rightValue": "stop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "stop"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000031",
+      "name": "Phase 3 Kickoff — Start",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3600,
+        -380
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '/actions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ action: 'kickoff', requestId: $execution.id + ':kickoff:' + $runIndex, resume: true, payload: { overwriteArtifact: String($json.resumeArtifactConsent) === 'true' || $json.artifactOverwriteAcknowledged === true } }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000032",
+      "name": "Phase 3 Kickoff — Poll",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        3820,
+        -380
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "payflow-poll-job",
+          "mode": "list",
+          "cachedResultName": "PayFlow Poll Job"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobId": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "jobId"
+          ],
+          "schema": [
+            {
+              "id": "jobId",
+              "displayName": "jobId",
+              "required": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000033",
+      "name": "Phase 3 Kickoff — Job Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3820,
+        -210
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000034",
+      "name": "Phase 4 Plan — Start",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4040,
+        -380
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '/actions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ action: 'plan', requestId: $execution.id + ':plan:' + $runIndex, resume: true, payload: { overwriteArtifact: true, answer: $json.plannerAnswer || undefined, sharpenTask: $json.planIntent === 'sharpen' ? ($json.gates['3'].details.sharpenTask || undefined) : undefined, coverageRevision: $json.planIntent === 'coverage-revision', revisionNote: $json.planIntent === 'coverage-revision' ? ($json.gates['4'].details.revisionNote || undefined) : undefined } }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000035",
+      "name": "Phase 4 Plan — Poll",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        4260,
+        -380
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "payflow-poll-job",
+          "mode": "list",
+          "cachedResultName": "PayFlow Poll Job"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobId": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "jobId"
+          ],
+          "schema": [
+            {
+              "id": "jobId",
+              "displayName": "jobId",
+              "required": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000036",
+      "name": "Phase 4 Plan — Job Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4260,
+        -210
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000037",
+      "name": "Planner Needs Clarification?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4480,
+        -380
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.evidence.needsInput }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000038",
+      "name": "Planner Clarification",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.6,
+      "position": [
+        4700,
+        -520
+      ],
+      "parameters": {
+        "operation": "page",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "plannerAnswer",
+              "fieldLabel": "Answer",
+              "fieldType": "textarea",
+              "requiredField": true
+            },
+            {
+              "fieldName": "runId",
+              "fieldLabel": "Run ID",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.runId || $json.id || \"\" }}"
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "Planner clarification",
+          "formDescription": "The planner needs input before it can complete the plan.<br><pre>{{ $json.evidence.question || $json.finalMessage }}</pre><b>Clone:</b> {{ $json.clonePath || '(demo mode: no clone)' }}",
+          "buttonLabel": "Resume planner session"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000039",
+      "name": "Plan — Human Gate 3",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.6,
+      "position": [
+        4700,
+        -280
+      ],
+      "parameters": {
+        "operation": "page",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "decision",
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "approve"
+                  },
+                  {
+                    "option": "sharpen"
+                  },
+                  {
+                    "option": "stop"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldName": "evidenceRaw",
+              "fieldLabel": "Evidence",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ JSON.stringify($json.evidence || $json) }}"
+            },
+            {
+              "fieldName": "sharpenTask",
+              "fieldLabel": "Task number to sharpen",
+              "fieldType": "number",
+              "requiredField": false
+            },
+            {
+              "fieldName": "runId",
+              "fieldLabel": "Run ID",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.runId || $json.id || \"\" }}"
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "Plan — Gate 3",
+          "formDescription": "Approve the full plan, sharpen one vague task, or stop.<br><br><b>Clone:</b> {{ $json.clonePath || $json.repoPath || '(demo mode: no clone)' }}<br><pre>{{ JSON.stringify($json.evidence || $json, null, 2) }}</pre>",
+          "buttonLabel": "Record decision"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000040",
+      "name": "Plan — Record Gate 3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        4920,
+        -280
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + $json.runId + '/gates/3' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ decision: $json.decision, details: { revisionNote: $json.revisionNote || undefined, productionDefect: $json.productionDefect || undefined, sharpenTask: $json.sharpenTask || undefined, task: $json.task || undefined, taskCount: $json.taskCount || undefined, evidenceRaw: $json.evidenceRaw || undefined } }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000041",
+      "name": "Route Gate 3",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        5140,
+        -280
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"3\"].decision }}",
+                    "rightValue": "approve",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "approve"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"3\"].decision }}",
+                    "rightValue": "sharpen",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "sharpen"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"3\"].decision }}",
+                    "rightValue": "stop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "stop"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000042",
+      "name": "Plan Revision — Sharpen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5140,
+        -100
+      ],
+      "parameters": {
+        "jsCode": "return $input.all().map(item => ({ json: { ...item.json, planIntent: 'sharpen' } }));"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000043",
+      "name": "Phase 5 Coverage — Start",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        5580,
+        -200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '/actions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ action: 'spec-check', requestId: $execution.id + ':spec-check:' + $runIndex, resume: true, payload: {} }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000044",
+      "name": "Phase 5 Coverage — Poll",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        5800,
+        -200
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "payflow-poll-job",
+          "mode": "list",
+          "cachedResultName": "PayFlow Poll Job"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobId": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "jobId"
+          ],
+          "schema": [
+            {
+              "id": "jobId",
+              "displayName": "jobId",
+              "required": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000045",
+      "name": "Phase 5 Coverage — Job Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        5800,
+        -30
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000046",
+      "name": "Coverage — Human Gate 4",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.6,
+      "position": [
+        6020,
+        -200
+      ],
+      "parameters": {
+        "operation": "page",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "decision",
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "revise-plan"
+                  },
+                  {
+                    "option": "stop"
+                  },
+                  {
+                    "option": "explicit-override"
+                  },
+                  {
+                    "option": "accept-go"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldName": "revisionNote",
+              "fieldLabel": "If you chose to revise, say what must change",
+              "fieldType": "textarea",
+              "requiredField": false
+            },
+            {
+              "fieldName": "evidenceRaw",
+              "fieldLabel": "Evidence",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ JSON.stringify($json.evidence || $json) }}"
+            },
+            {
+              "fieldName": "runId",
+              "fieldLabel": "Run ID",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.runId || $json.id || \"\" }}"
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "Coverage — Gate 4",
+          "formDescription": "NO-GO offers revision or stop first. Override is explicit and remains logged.<br><br><b>Clone:</b> {{ $json.clonePath || $json.repoPath || '(demo mode: no clone)' }}<br><pre>{{ JSON.stringify($json.evidence || $json, null, 2) }}</pre>",
+          "buttonLabel": "Record decision"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000047",
+      "name": "Coverage — Record Gate 4",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6240,
+        -200
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + $json.runId + '/gates/4' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ decision: $json.decision, details: { revisionNote: $json.revisionNote || undefined, productionDefect: $json.productionDefect || undefined, sharpenTask: $json.sharpenTask || undefined, task: $json.task || undefined, taskCount: $json.taskCount || undefined, evidenceRaw: $json.evidenceRaw || undefined } }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000048",
+      "name": "Route Gate 4",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        6460,
+        -200
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"4\"].decision }}",
+                    "rightValue": "revise-plan",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "revise-plan"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"4\"].decision }}",
+                    "rightValue": "stop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "stop"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"4\"].decision }}",
+                    "rightValue": "explicit-override",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "explicit-override"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"4\"].decision }}",
+                    "rightValue": "accept-go",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "accept-go"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000049",
+      "name": "Plan Revision — Coverage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6460,
+        -420
+      ],
+      "parameters": {
+        "jsCode": "return $input.all().map(item => ({ json: { ...item.json, planIntent: 'coverage-revision' } }));"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000050",
+      "name": "Phase 6 Build — Load Plan State",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6900,
+        -40
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000051",
+      "name": "Phase 6 Build — Prepare Tasks",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7120,
+        -40
+      ],
+      "parameters": {
+        "jsCode": "const count = Number($json.planTaskCount); if (!Number.isInteger(count) || count < 1) { throw new Error('This run has no recorded plan task count. Resume at the plan phase so the plan is read before the build starts.'); } const runId = $json.id; return Array.from({ length: count }, (_, index) => ({ json: { runId, task: index + 1, taskCount: count } }));"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000052",
+      "name": "Phase 6 Build — One Task at a Time",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        7340,
+        -40
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000053",
+      "name": "Phase 6 Build Task — Start",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7560,
+        80
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '/actions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ action: 'build-task', requestId: $execution.id + ':build-task:' + $runIndex, resume: true, payload: { task: Number($json.task), taskCount: Number($json.taskCount) } }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000054",
+      "name": "Phase 6 Build Task — Poll",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        7780,
+        80
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "payflow-poll-job",
+          "mode": "list",
+          "cachedResultName": "PayFlow Poll Job"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobId": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "jobId"
+          ],
+          "schema": [
+            {
+              "id": "jobId",
+              "displayName": "jobId",
+              "required": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000055",
+      "name": "Phase 6 Build Task — Job Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        7780,
+        250
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000056",
+      "name": "Is First Build Task?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        8000,
+        80
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.evidence.task }}",
+              "rightValue": 1,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000057",
+      "name": "Build Task 1 — Human Gate 5",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.6,
+      "position": [
+        8220,
+        0
+      ],
+      "parameters": {
+        "operation": "page",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "decision",
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "continue"
+                  },
+                  {
+                    "option": "waive-remaining"
+                  },
+                  {
+                    "option": "stop"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldName": "evidenceRaw",
+              "fieldLabel": "Evidence",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ JSON.stringify($json.evidence || $json) }}"
+            },
+            {
+              "fieldName": "task",
+              "fieldLabel": "Task",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.evidence.task }}"
+            },
+            {
+              "fieldName": "taskCount",
+              "fieldLabel": "Task count",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.evidence.taskCount }}"
+            },
+            {
+              "fieldName": "runId",
+              "fieldLabel": "Run ID",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.runId || $json.id || \"\" }}"
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "Build Task 1 — Gate 5",
+          "formDescription": "Review task 1. Only now may you waive the remaining per-task checks.<br><br><b>Clone:</b> {{ $json.clonePath || $json.repoPath || '(demo mode: no clone)' }}<br><pre>{{ JSON.stringify($json.evidence || $json, null, 2) }}</pre>",
+          "buttonLabel": "Record decision"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000058",
+      "name": "Build Task 1 — Record Gate 5",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8440,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + $json.runId + '/gates/5' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ decision: $json.decision, details: { revisionNote: $json.revisionNote || undefined, productionDefect: $json.productionDefect || undefined, sharpenTask: $json.sharpenTask || undefined, task: $json.task || undefined, taskCount: $json.taskCount || undefined, evidenceRaw: $json.evidenceRaw || undefined } }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000059",
+      "name": "Build Task — Human Gate 5",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.6,
+      "position": [
+        8220,
+        180
+      ],
+      "parameters": {
+        "operation": "page",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "decision",
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "continue"
+                  },
+                  {
+                    "option": "stop"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldName": "evidenceRaw",
+              "fieldLabel": "Evidence",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ JSON.stringify($json.evidence || $json) }}"
+            },
+            {
+              "fieldName": "task",
+              "fieldLabel": "Task",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.evidence.task }}"
+            },
+            {
+              "fieldName": "taskCount",
+              "fieldLabel": "Task count",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.evidence.taskCount }}"
+            },
+            {
+              "fieldName": "runId",
+              "fieldLabel": "Run ID",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.runId || $json.id || \"\" }}"
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "Build Task — Gate 5",
+          "formDescription": "Review this completed plan task before the next task starts.<br><br><b>Clone:</b> {{ $json.clonePath || $json.repoPath || '(demo mode: no clone)' }}<br><pre>{{ JSON.stringify($json.evidence || $json, null, 2) }}</pre>",
+          "buttonLabel": "Record decision"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000060",
+      "name": "Build Task — Record Gate 5",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8440,
+        180
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + $json.runId + '/gates/5' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ decision: $json.decision, details: { revisionNote: $json.revisionNote || undefined, productionDefect: $json.productionDefect || undefined, sharpenTask: $json.sharpenTask || undefined, task: $json.task || undefined, taskCount: $json.taskCount || undefined, evidenceRaw: $json.evidenceRaw || undefined } }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000061",
+      "name": "Route Gate 5 First",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        8660,
+        0
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"5\"].decision }}",
+                    "rightValue": "continue",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "continue"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"5\"].decision }}",
+                    "rightValue": "waive-remaining",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "waive-remaining"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"5\"].decision }}",
+                    "rightValue": "stop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "stop"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000062",
+      "name": "Route Gate 5 Next",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        8660,
+        180
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"5\"].decision }}",
+                    "rightValue": "continue",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "continue"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"5\"].decision }}",
+                    "rightValue": "stop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "stop"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000063",
+      "name": "Remaining Tasks Exist?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        8900,
+        -260
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ Number($json.gates['5'].details.taskCount) > Number($json.gates['5'].details.task) }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000064",
+      "name": "Phase 6 Build Remaining — Start",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        8900,
+        -100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '/actions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ action: 'build-remaining', requestId: $execution.id + ':build-remaining:' + $runIndex, resume: true, payload: { fromTask: Number($json.gates['5'].details.task) + 1, toTask: Number($json.gates['5'].details.taskCount) } }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000065",
+      "name": "Phase 6 Build Remaining — Poll",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        9120,
+        -100
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "payflow-poll-job",
+          "mode": "list",
+          "cachedResultName": "PayFlow Poll Job"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobId": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "jobId"
+          ],
+          "schema": [
+            {
+              "id": "jobId",
+              "displayName": "jobId",
+              "required": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000066",
+      "name": "Phase 6 Build Remaining — Job Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        9120,
+        70
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000067",
+      "name": "Phase 7 Tests — Start",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        9340,
+        -20
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '/actions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ action: 'verify', requestId: $execution.id + ':verify:' + $runIndex, resume: true, payload: {} }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000068",
+      "name": "Phase 7 Tests — Poll",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        9560,
+        -20
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "payflow-poll-job",
+          "mode": "list",
+          "cachedResultName": "PayFlow Poll Job"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobId": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "jobId"
+          ],
+          "schema": [
+            {
+              "id": "jobId",
+              "displayName": "jobId",
+              "required": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000069",
+      "name": "Phase 7 Tests — Job Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        9560,
+        150
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000070",
+      "name": "Tests — Human Gate 6",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.6,
+      "position": [
+        9780,
+        -20
+      ],
+      "parameters": {
+        "operation": "page",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "decision",
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "accept-green"
+                  },
+                  {
+                    "option": "return-production-defect"
+                  },
+                  {
+                    "option": "stop"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldName": "evidenceRaw",
+              "fieldLabel": "Evidence",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ JSON.stringify($json.evidence || $json) }}"
+            },
+            {
+              "fieldName": "productionDefect",
+              "fieldLabel": "Production defect",
+              "fieldType": "textarea",
+              "requiredField": false
+            },
+            {
+              "fieldName": "runId",
+              "fieldLabel": "Run ID",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.runId || $json.id || \"\" }}"
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "Tests — Gate 6",
+          "formDescription": "Accept green verification, return a production defect to the implementer, or stop.<br><br><b>Clone:</b> {{ $json.clonePath || $json.repoPath || '(demo mode: no clone)' }}<br><pre>{{ JSON.stringify($json.evidence || $json, null, 2) }}</pre>",
+          "buttonLabel": "Record decision"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000071",
+      "name": "Tests — Record Gate 6",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        10000,
+        -20
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + $json.runId + '/gates/6' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ decision: $json.decision, details: { revisionNote: $json.revisionNote || undefined, productionDefect: $json.productionDefect || undefined, sharpenTask: $json.sharpenTask || undefined, task: $json.task || undefined, taskCount: $json.taskCount || undefined, evidenceRaw: $json.evidenceRaw || undefined } }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000072",
+      "name": "Route Gate 6",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        10220,
+        -20
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"6\"].decision }}",
+                    "rightValue": "accept-green",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "accept-green"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"6\"].decision }}",
+                    "rightValue": "return-production-defect",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "return-production-defect"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"6\"].decision }}",
+                    "rightValue": "stop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "stop"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000073",
+      "name": "Phase 9 Fix Production Defect — Start",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        10460,
+        120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '/actions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ action: 'fix-defect', requestId: $execution.id + ':fix-defect:' + $runIndex, resume: true, payload: {} }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000074",
+      "name": "Phase 9 Fix Production Defect — Poll",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        10680,
+        120
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "payflow-poll-job",
+          "mode": "list",
+          "cachedResultName": "PayFlow Poll Job"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobId": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "jobId"
+          ],
+          "schema": [
+            {
+              "id": "jobId",
+              "displayName": "jobId",
+              "required": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000075",
+      "name": "Phase 9 Fix Production Defect — Job Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        10680,
+        290
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000076",
+      "name": "Phase 8 Code Review — Start",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        10460,
+        -180
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '/actions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ action: 'review', requestId: $execution.id + ':review:' + $runIndex, resume: true, payload: {} }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000077",
+      "name": "Phase 8 Code Review — Poll",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        10680,
+        -180
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "payflow-poll-job",
+          "mode": "list",
+          "cachedResultName": "PayFlow Poll Job"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobId": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "jobId"
+          ],
+          "schema": [
+            {
+              "id": "jobId",
+              "displayName": "jobId",
+              "required": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000078",
+      "name": "Phase 8 Code Review — Job Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        10680,
+        -10
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000079",
+      "name": "Security Reviewer Available?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        10900,
+        -180
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.evidence.securityReviewer }}",
+              "rightValue": "available",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000080",
+      "name": "Phase 8 Security Review — Start",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        11120,
+        -300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '/actions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ action: 'security-review', requestId: $execution.id + ':security-review:' + $runIndex, resume: true, payload: {} }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000081",
+      "name": "Phase 8 Security Review — Poll",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        11340,
+        -300
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "payflow-poll-job",
+          "mode": "list",
+          "cachedResultName": "PayFlow Poll Job"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobId": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "jobId"
+          ],
+          "schema": [
+            {
+              "id": "jobId",
+              "displayName": "jobId",
+              "required": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000082",
+      "name": "Phase 8 Security Review — Job Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        11340,
+        -130
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000083",
+      "name": "Missing Security Review — Acknowledge",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.6,
+      "position": [
+        11120,
+        -80
+      ],
+      "parameters": {
+        "operation": "page",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "securityDecision",
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "continue-without-security-review"
+                  },
+                  {
+                    "option": "stop"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldName": "runId",
+              "fieldLabel": "Run ID",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.runId || $json.id || \"\" }}"
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "Security review unavailable",
+          "formDescription": "No security-reviewer exists in this clone. This is not a passing security review.<br><b>Clone:</b> {{ $json.clonePath || '(demo mode: no clone)' }}",
+          "buttonLabel": "Record acknowledgement"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000084",
+      "name": "Route Missing Security Review",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        11340,
+        -80
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.securityDecision }}",
+                    "rightValue": "continue-without-security-review",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "continue-without-security-review"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.securityDecision }}",
+                    "rightValue": "stop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "stop"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000085",
+      "name": "Phase 8 Review — Load Findings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        11560,
+        -220
+      ],
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000086",
+      "name": "Review Findings — Human Gate 7",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.6,
+      "position": [
+        11800,
+        -220
+      ],
+      "parameters": {
+        "operation": "page",
+        "formFields": {
+          "values": [
+            {
+              "fieldName": "decision",
+              "fieldLabel": "Decision",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "all-high-medium"
+                  },
+                  {
+                    "option": "high-only"
+                  },
+                  {
+                    "option": "include-low"
+                  },
+                  {
+                    "option": "individual-ids"
+                  },
+                  {
+                    "option": "none"
+                  },
+                  {
+                    "option": "stop"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldName": "findingIds",
+              "fieldLabel": "Finding IDs, comma-separated",
+              "fieldType": "text",
+              "requiredField": false
+            },
+            {
+              "fieldName": "continueWithoutSecurity",
+              "fieldLabel": "Security review acknowledgement",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.securityReviewer === 'missing' }}"
+            },
+            {
+              "fieldName": "findingsJson",
+              "fieldLabel": "Findings",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ JSON.stringify($json.findings || []) }}"
+            },
+            {
+              "fieldName": "runId",
+              "fieldLabel": "Run ID",
+              "fieldType": "hiddenField",
+              "requiredField": false,
+              "fieldValue": "={{ $json.runId || $json.id || \"\" }}"
+            }
+          ]
+        },
+        "options": {
+          "formTitle": "Review Findings — Gate 7",
+          "formDescription": "Select exactly which findings the implementer may fix. Missing security review remains explicitly acknowledged.<br><br><b>Clone:</b> {{ $json.repoPath || '(demo mode: no clone)' }}<br><pre>{{ JSON.stringify($json.findings || [], null, 2) }}</pre>",
+          "buttonLabel": "Record decision"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000087",
+      "name": "Resolve Selected Findings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        12020,
+        -220
+      ],
+      "parameters": {
+        "jsCode": "const gate = $json; const all = JSON.parse(gate.findingsJson || '[]'); let ids = []; if (gate.decision === 'all-high-medium') ids = all.filter(f => ['HIGH','MEDIUM'].includes(f.severity)).map(f => f.id); else if (gate.decision === 'high-only') ids = all.filter(f => f.severity === 'HIGH').map(f => f.id); else if (gate.decision === 'include-low') ids = all.map(f => f.id); else if (gate.decision === 'individual-ids') ids = String(gate.findingIds || '').split(',').map(x => x.trim()).filter(Boolean); return [{ json: { ...gate, selectedFindingIds: ids } }];"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000088",
+      "name": "Review Findings — Record Gate 7",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        12240,
+        -220
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + $json.runId + '/gates/7' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ decision: $json.decision, details: { selectedFindingIds: $json.selectedFindingIds, continueWithoutSecurity: String($json.continueWithoutSecurity) === 'true' } }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000089",
+      "name": "Route Gate 7",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        12460,
+        -220
+      ],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"7\"].decision }}",
+                    "rightValue": "all-high-medium",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "all-high-medium"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"7\"].decision }}",
+                    "rightValue": "high-only",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "high-only"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"7\"].decision }}",
+                    "rightValue": "include-low",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "include-low"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"7\"].decision }}",
+                    "rightValue": "individual-ids",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "individual-ids"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"7\"].decision }}",
+                    "rightValue": "none",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "none"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.gates[\"7\"].decision }}",
+                    "rightValue": "stop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "stop"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000090",
+      "name": "Phase 9 Fix Selected Findings — Start",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        12700,
+        -340
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '/actions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ action: 'fix-findings', requestId: $execution.id + ':fix-findings:' + $runIndex, resume: true, payload: { selectedFindingIds: $json.gates['7'].details.selectedFindingIds } }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000091",
+      "name": "Phase 9 Fix Selected Findings — Poll",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        12920,
+        -340
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "payflow-poll-job",
+          "mode": "list",
+          "cachedResultName": "PayFlow Poll Job"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobId": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "jobId"
+          ],
+          "schema": [
+            {
+              "id": "jobId",
+              "displayName": "jobId",
+              "required": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000092",
+      "name": "Phase 9 Fix Selected Findings — Job Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        12920,
+        -170
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000093",
+      "name": "Phase 10 Close — Start",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        12700,
+        -100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '/actions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ action: 'close', requestId: $execution.id + ':close:' + $runIndex, resume: true, payload: {} }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000094",
+      "name": "Phase 10 Close — Poll",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        12920,
+        -100
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "payflow-poll-job",
+          "mode": "list",
+          "cachedResultName": "PayFlow Poll Job"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobId": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "jobId"
+          ],
+          "schema": [
+            {
+              "id": "jobId",
+              "displayName": "jobId",
+              "required": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000095",
+      "name": "Phase 10 Close — Job Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        12920,
+        70
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000096",
+      "name": "Phase 10 Final Workflow Audit — Start",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        13140,
+        -100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '/actions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ action: 'final-audit', requestId: $execution.id + ':final-audit:' + $runIndex, resume: true, payload: {} }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000097",
+      "name": "Phase 10 Final Workflow Audit — Poll",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        13360,
+        -100
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "payflow-poll-job",
+          "mode": "list",
+          "cachedResultName": "PayFlow Poll Job"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "jobId": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "jobId"
+          ],
+          "schema": [
+            {
+              "id": "jobId",
+              "displayName": "jobId",
+              "required": true,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string"
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000098",
+      "name": "Phase 10 Final Workflow Audit — Job Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        13360,
+        70
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "succeeded",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000099",
+      "name": "PayFlow Complete",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.6,
+      "position": [
+        13580,
+        -100
+      ],
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "={{ $json.evidence.passed ? 'Final audit passed' : 'Final audit blocked the run' }}",
+        "completionMessage": "=Clone: {{ $json.clonePath || '(demo mode)' }}\n\n{{ JSON.stringify($json.evidence, null, 2) }}\n\nThe closeout artifact contains suggested commands. This automation did not commit, push, or create a PR.",
+        "options": {
+          "formTitle": "PayFlow run complete"
+        }
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000100",
+      "name": "Stop Retained Run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        12700,
+        220
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.PAYFLOW_RUNNER_URL + '/v1/runs/' + ($json.runId || $json.id) + '/stop' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.PAYFLOW_RUNNER_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 3600000
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ reason: 'Stopped at a human gate' }) }}"
+      }
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000101",
+      "name": "PayFlow Stopped — Run Is Resumable",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.6,
+      "position": [
+        12920,
+        220
+      ],
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "Run stopped safely",
+        "completionMessage": "=Run {{ $json.id }} is retained and resumable.\nClone: {{ $json.repoPath || '(demo mode)' }}",
+        "options": {
+          "formTitle": "PayFlow stopped"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Action Failed — Resume Or Stop": {
+      "main": [
+        [
+          {
+            "node": "Route Action Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Action Failure": {
+      "main": [
+        [
+          {
+            "node": "Reload Run After Failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop Retained Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reload Run After Failure": {
+      "main": [
+        [
+          {
+            "node": "Resume — Choose Next Phase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start or Resume PayFlow": {
+      "main": [
+        [
+          {
+            "node": "Route Start Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Start Mode": {
+      "main": [
+        [
+          {
+            "node": "Create Real Run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Demo Run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Load Retained Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Real Run": {
+      "main": [
+        [
+          {
+            "node": "Canonical Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Demo Run": {
+      "main": [
+        [
+          {
+            "node": "Canonical Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Retained Run": {
+      "main": [
+        [
+          {
+            "node": "Canonical Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Canonical Run": {
+      "main": [
+        [
+          {
+            "node": "Is Resumed Run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preflight — Poll": {
+      "main": [
+        [
+          {
+            "node": "Preflight — Job Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner Unreachable — Execution Halted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preflight — Start": {
+      "main": [
+        [
+          {
+            "node": "Preflight — Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preflight — Job Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Route Preflight Decision",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action Failed — Resume Or Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Resumed Run?": {
+      "main": [
+        [
+          {
+            "node": "Resume — Choose Next Phase",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preflight — Branch Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preflight — Branch Decision": {
+      "main": [
+        [
+          {
+            "node": "Preflight — Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resume — Choose Next Phase": {
+      "main": [
+        [
+          {
+            "node": "Route Resume Phase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 1 Acceptance — Poll": {
+      "main": [
+        [
+          {
+            "node": "Phase 1 Acceptance — Job Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner Unreachable — Execution Halted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 1 Acceptance — Start": {
+      "main": [
+        [
+          {
+            "node": "Phase 1 Acceptance — Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 1 Acceptance — Job Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Acceptance — Human Gate 1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action Failed — Resume Or Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Preflight Decision": {
+      "main": [
+        [
+          {
+            "node": "Phase 1 Acceptance — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 1 Acceptance — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop Retained Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Resume Phase": {
+      "main": [
+        [
+          {
+            "node": "Phase 1 Acceptance — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 2 ADR — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 3 Kickoff — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 4 Plan — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 5 Coverage — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 6 Build — Load Plan State",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 7 Tests — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 8 Code Review — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 10 Close — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop Retained Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acceptance — Human Gate 1": {
+      "main": [
+        [
+          {
+            "node": "Acceptance — Record Gate 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Acceptance — Record Gate 1": {
+      "main": [
+        [
+          {
+            "node": "Route Gate 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 2 ADR — Poll": {
+      "main": [
+        [
+          {
+            "node": "Phase 2 ADR — Job Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner Unreachable — Execution Halted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 2 ADR — Start": {
+      "main": [
+        [
+          {
+            "node": "Phase 2 ADR — Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 2 ADR — Job Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "ADR — Human Gate 2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action Failed — Resume Or Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Gate 1": {
+      "main": [
+        [
+          {
+            "node": "Phase 2 ADR — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 1 Acceptance — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop Retained Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ADR — Human Gate 2": {
+      "main": [
+        [
+          {
+            "node": "ADR — Record Gate 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ADR — Record Gate 2": {
+      "main": [
+        [
+          {
+            "node": "Route Gate 2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 3 Kickoff — Poll": {
+      "main": [
+        [
+          {
+            "node": "Phase 3 Kickoff — Job Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner Unreachable — Execution Halted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 3 Kickoff — Start": {
+      "main": [
+        [
+          {
+            "node": "Phase 3 Kickoff — Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 3 Kickoff — Job Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Phase 4 Plan — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action Failed — Resume Or Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Gate 2": {
+      "main": [
+        [
+          {
+            "node": "Phase 3 Kickoff — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 2 ADR — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop Retained Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 4 Plan — Poll": {
+      "main": [
+        [
+          {
+            "node": "Phase 4 Plan — Job Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner Unreachable — Execution Halted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 4 Plan — Start": {
+      "main": [
+        [
+          {
+            "node": "Phase 4 Plan — Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 4 Plan — Job Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Planner Needs Clarification?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action Failed — Resume Or Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Planner Needs Clarification?": {
+      "main": [
+        [
+          {
+            "node": "Planner Clarification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Plan — Human Gate 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Planner Clarification": {
+      "main": [
+        [
+          {
+            "node": "Phase 4 Plan — Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan — Human Gate 3": {
+      "main": [
+        [
+          {
+            "node": "Plan — Record Gate 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan — Record Gate 3": {
+      "main": [
+        [
+          {
+            "node": "Route Gate 3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Gate 3": {
+      "main": [
+        [
+          {
+            "node": "Phase 5 Coverage — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Plan Revision — Sharpen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop Retained Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Revision — Sharpen": {
+      "main": [
+        [
+          {
+            "node": "Phase 4 Plan — Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 5 Coverage — Poll": {
+      "main": [
+        [
+          {
+            "node": "Phase 5 Coverage — Job Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner Unreachable — Execution Halted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 5 Coverage — Start": {
+      "main": [
+        [
+          {
+            "node": "Phase 5 Coverage — Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 5 Coverage — Job Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Coverage — Human Gate 4",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action Failed — Resume Or Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Coverage — Human Gate 4": {
+      "main": [
+        [
+          {
+            "node": "Coverage — Record Gate 4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Coverage — Record Gate 4": {
+      "main": [
+        [
+          {
+            "node": "Route Gate 4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Gate 4": {
+      "main": [
+        [
+          {
+            "node": "Plan Revision — Coverage",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop Retained Run",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 6 Build — Load Plan State",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 6 Build — Load Plan State",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Revision — Coverage": {
+      "main": [
+        [
+          {
+            "node": "Phase 4 Plan — Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 6 Build — Load Plan State": {
+      "main": [
+        [
+          {
+            "node": "Phase 6 Build — Prepare Tasks",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 6 Build — Prepare Tasks": {
+      "main": [
+        [
+          {
+            "node": "Phase 6 Build — One Task at a Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 6 Build Task — Poll": {
+      "main": [
+        [
+          {
+            "node": "Phase 6 Build Task — Job Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner Unreachable — Execution Halted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 6 Build Task — Start": {
+      "main": [
+        [
+          {
+            "node": "Phase 6 Build Task — Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 6 Build Task — Job Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Is First Build Task?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action Failed — Resume Or Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 6 Build — One Task at a Time": {
+      "main": [
+        [
+          {
+            "node": "Phase 7 Tests — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 6 Build Task — Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Task 1 — Human Gate 5": {
+      "main": [
+        [
+          {
+            "node": "Build Task 1 — Record Gate 5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Task — Human Gate 5": {
+      "main": [
+        [
+          {
+            "node": "Build Task — Record Gate 5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is First Build Task?": {
+      "main": [
+        [
+          {
+            "node": "Build Task 1 — Human Gate 5",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Task — Human Gate 5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Task 1 — Record Gate 5": {
+      "main": [
+        [
+          {
+            "node": "Route Gate 5 First",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Task — Record Gate 5": {
+      "main": [
+        [
+          {
+            "node": "Route Gate 5 Next",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Gate 5 First": {
+      "main": [
+        [
+          {
+            "node": "Phase 6 Build — One Task at a Time",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Remaining Tasks Exist?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop Retained Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Gate 5 Next": {
+      "main": [
+        [
+          {
+            "node": "Phase 6 Build — One Task at a Time",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop Retained Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 6 Build Remaining — Poll": {
+      "main": [
+        [
+          {
+            "node": "Phase 6 Build Remaining — Job Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner Unreachable — Execution Halted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 6 Build Remaining — Start": {
+      "main": [
+        [
+          {
+            "node": "Phase 6 Build Remaining — Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 6 Build Remaining — Job Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Phase 7 Tests — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action Failed — Resume Or Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remaining Tasks Exist?": {
+      "main": [
+        [
+          {
+            "node": "Phase 6 Build Remaining — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 7 Tests — Start",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 7 Tests — Poll": {
+      "main": [
+        [
+          {
+            "node": "Phase 7 Tests — Job Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner Unreachable — Execution Halted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 7 Tests — Start": {
+      "main": [
+        [
+          {
+            "node": "Phase 7 Tests — Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 7 Tests — Job Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Tests — Human Gate 6",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action Failed — Resume Or Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tests — Human Gate 6": {
+      "main": [
+        [
+          {
+            "node": "Tests — Record Gate 6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tests — Record Gate 6": {
+      "main": [
+        [
+          {
+            "node": "Route Gate 6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 9 Fix Production Defect — Poll": {
+      "main": [
+        [
+          {
+            "node": "Phase 9 Fix Production Defect — Job Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner Unreachable — Execution Halted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 9 Fix Production Defect — Start": {
+      "main": [
+        [
+          {
+            "node": "Phase 9 Fix Production Defect — Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 9 Fix Production Defect — Job Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Phase 7 Tests — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action Failed — Resume Or Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Gate 6": {
+      "main": [
+        [
+          {
+            "node": "Phase 8 Code Review — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 9 Fix Production Defect — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop Retained Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 8 Code Review — Poll": {
+      "main": [
+        [
+          {
+            "node": "Phase 8 Code Review — Job Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner Unreachable — Execution Halted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 8 Code Review — Start": {
+      "main": [
+        [
+          {
+            "node": "Phase 8 Code Review — Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 8 Code Review — Job Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Security Reviewer Available?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action Failed — Resume Or Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 8 Security Review — Poll": {
+      "main": [
+        [
+          {
+            "node": "Phase 8 Security Review — Job Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner Unreachable — Execution Halted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 8 Security Review — Start": {
+      "main": [
+        [
+          {
+            "node": "Phase 8 Security Review — Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 8 Security Review — Job Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Phase 8 Review — Load Findings",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action Failed — Resume Or Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Security Reviewer Available?": {
+      "main": [
+        [
+          {
+            "node": "Phase 8 Security Review — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Missing Security Review — Acknowledge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Missing Security Review — Acknowledge": {
+      "main": [
+        [
+          {
+            "node": "Route Missing Security Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Missing Security Review": {
+      "main": [
+        [
+          {
+            "node": "Phase 8 Review — Load Findings",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop Retained Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 8 Review — Load Findings": {
+      "main": [
+        [
+          {
+            "node": "Review Findings — Human Gate 7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Review Findings — Human Gate 7": {
+      "main": [
+        [
+          {
+            "node": "Resolve Selected Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Selected Findings": {
+      "main": [
+        [
+          {
+            "node": "Review Findings — Record Gate 7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Review Findings — Record Gate 7": {
+      "main": [
+        [
+          {
+            "node": "Route Gate 7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 9 Fix Selected Findings — Poll": {
+      "main": [
+        [
+          {
+            "node": "Phase 9 Fix Selected Findings — Job Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner Unreachable — Execution Halted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 9 Fix Selected Findings — Start": {
+      "main": [
+        [
+          {
+            "node": "Phase 9 Fix Selected Findings — Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 9 Fix Selected Findings — Job Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Phase 7 Tests — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action Failed — Resume Or Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Gate 7": {
+      "main": [
+        [
+          {
+            "node": "Phase 9 Fix Selected Findings — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 9 Fix Selected Findings — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 9 Fix Selected Findings — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 9 Fix Selected Findings — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Phase 10 Close — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Stop Retained Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 10 Close — Poll": {
+      "main": [
+        [
+          {
+            "node": "Phase 10 Close — Job Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner Unreachable — Execution Halted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 10 Close — Start": {
+      "main": [
+        [
+          {
+            "node": "Phase 10 Close — Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 10 Close — Job Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "Phase 10 Final Workflow Audit — Start",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action Failed — Resume Or Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 10 Final Workflow Audit — Poll": {
+      "main": [
+        [
+          {
+            "node": "Phase 10 Final Workflow Audit — Job Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Runner Unreachable — Execution Halted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 10 Final Workflow Audit — Start": {
+      "main": [
+        [
+          {
+            "node": "Phase 10 Final Workflow Audit — Poll",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phase 10 Final Workflow Audit — Job Succeeded?": {
+      "main": [
+        [
+          {
+            "node": "PayFlow Complete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action Failed — Resume Or Stop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stop Retained Run": {
+      "main": [
+        [
+          {
+            "node": "PayFlow Stopped — Run Is Resumable",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true,
+    "timezone": "Europe/London"
+  },
+  "pinData": {},
+  "versionId": "10000000-0000-4000-8000-000000000001",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

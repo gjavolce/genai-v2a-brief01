@@ -1,0 +1,35 @@
+name: payflow-n8n
+
+services:
+  n8n:
+    image: n8nio/n8n:2.36.7
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: http
+      N8N_EDITOR_BASE_URL: http://localhost:5678
+      N8N_WEBHOOK_URL: http://localhost:5678/
+      N8N_SECURE_COOKIE: "false"
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      N8N_VERSION_NOTIFICATIONS_ENABLED: "false"
+      N8N_UNVERIFIED_PACKAGES_ENABLED: "false"
+      N8N_RUNNERS_TASK_TIMEOUT: "300"
+      N8N_COMPRESSION_NODE_MAX_DECOMPRESSED_SIZE_BYTES: "268435456"
+      N8N_COMPRESSION_NODE_MAX_ZIP_ENTRIES: "1000"
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      PAYFLOW_RUNNER_URL: ${PAYFLOW_RUNNER_URL:-http://host.docker.internal:5680}
+      PAYFLOW_RUNNER_TOKEN: ${PAYFLOW_RUNNER_TOKEN}
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-Europe/London}
+      TZ: ${GENERIC_TIMEZONE:-Europe/London}
+    volumes:
+      - n8n-data:/home/node/.n8n
+      - ./workflows:/workflows:ro
+
+volumes:
+  n8n-data:

@@ -35,6 +35,11 @@ tbody tr:hover {
   background: #f5f5f5;
 }
 
+.transaction-description {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
 dl {
   display: grid;
   grid-template-columns: 10rem 1fr;

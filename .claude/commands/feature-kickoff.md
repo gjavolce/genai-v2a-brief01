@@ -17,7 +17,7 @@ Create or update only `docs/features/$1/$1-plan-request.md`.
 4. `api/src/main/java/**/customer/**` — reference slice and local conventions.
 
 If `acceptance.md` or `adr.md` is missing, stop. Name the missing file. Tell
-the user to run `/business-analyst $1` or `/architect $1` first. Do not create
+the human to run `/business-analyst $1` or `/architect $1` first. Do not create
 missing content.
 
 # File content

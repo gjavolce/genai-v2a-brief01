@@ -9,6 +9,7 @@ public class AccountMapper {
 
     public AccountDto toDto(Account account) {
         return new AccountDto(
+                account.getId(),
                 account.getAccountName(),
                 mask(account.getAccountNumber()),
                 account.getCurrency(),

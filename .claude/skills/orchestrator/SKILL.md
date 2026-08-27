@@ -84,7 +84,7 @@ to this gate.
 
 ## 5. Coverage check
 
-Use `spec-guardian`:
+Run:
 
 ```
 Use the spec-guardian subagent to check docs/features/NN/NN-plan.md against docs/features/NN/NN-acceptance.md
@@ -94,7 +94,9 @@ It returns a coverage table and `GO` or `NO-GO`.
 
 **GATE 4 — Do you accept the verdict?** Show the verdict and each uncovered
 criterion ID. On `NO-GO`, offer plan revision or stop. Do not first offer to
-continue. The human can override this decision.
+continue. The human can override this decision. Also offer the gate-5 waiver
+now: state that the human can ask to skip the per-task diff gate and build the
+remaining tasks in one run instead.
 
 ## 6. Build
 
@@ -107,10 +109,10 @@ Use the implementer subagent to build task N of docs/features/NN/NN-plan.md
 After each task, run `git diff --stat` and report it.
 
 **GATE 5 — Read the diff.** Ask after each task. Offer: continue to the next
-task; stop and inspect; or continue remaining tasks without another gate. Offer
-the third choice after the first task. If accepted, state that gate 5 is waived
-for the remaining build tasks. Run the remaining task range in one implementer
-invocation. Report one combined diffstat when it returns.
+task; stop and inspect; or continue remaining tasks without another gate. If
+accepted, state that gate 5 is waived for the remaining build tasks. Run the
+remaining task range in one implementer invocation. Report one combined
+diffstat when it returns.
 
 If the implementer reports that the plan is wrong or refuses to continue, stop
 and ask the human. Do not rewrite the plan.
@@ -125,13 +127,14 @@ Use the test-verifier subagent to verify task NN
 
 It maps criteria to tests, writes missing tests, and runs `./verify.sh`.
 
-**GATE 6 — Is it genuinely green?** Report the criterion-to-test map and the
-`verify.sh` result verbatim. Read `verify.sh` and state what it checked. If it
-did not run unit tests, state what green means. It means that the stack started
-and the smoke test passed. It does not mean that the test suites passed.
+**GATE 6 — Did the suite genuinely pass?** Report the criterion-to-test map and
+the `verify.sh` result verbatim. Read `verify.sh` and state what it checked. If
+it did not run unit tests, state what a pass means. A pass means the stack
+started and the smoke test passed. It does not mean that the test suites
+passed.
 
 If `test-verifier` reports a production defect, stop and ask the human. Do not
-weaken a test to obtain green.
+weaken a test to force a pass.
 
 ## 8. Review
 
@@ -148,9 +151,9 @@ Check whether the current client has a `security-reviewer`.
 
 **GATE 7 — Which findings are you fixing?** Show every finding as written:
 severity, `file:line`, finding, and remediation. Do not change severity or
-soften a HIGH. Offer: all HIGH and MEDIUM; HIGH only; include LOW; or select
-individual findings. If both reviewers have no findings, say so and go to phase
-10.
+lower a HIGH finding to a lower severity. Offer: all HIGH and MEDIUM; HIGH
+only; include LOW; or select individual findings. If both reviewers have no
+findings, say so and go to phase 10.
 
 ## 9. Fix and verify again
 
@@ -160,8 +163,8 @@ Run:
 Use the implementer subagent to fix every HIGH and MEDIUM finding above. Change nothing else.
 ```
 
-Name the selected findings. Run `test-verifier` again. If it is not green,
-return to gate 6.
+Name the selected findings. Run `test-verifier` again. If the suite does not
+pass, return to gate 6.
 
 ## 10. Close
 
@@ -186,4 +189,4 @@ Before completion, report whether:
 - no commit, push, or PR command ran;
 - `docs/features/NN/` contains acceptance, ADR, plan request, plan, and PR;
 - the diff changes database, backend, and frontend; and
-- you stated what `verify.sh` checked, not only that it was green.
+- you stated what `verify.sh` checked, not only that it passed.

@@ -14,7 +14,7 @@ decision.
 ## What you read, in order
 
 1. `docs/features/NN/NN-acceptance.md` — input. If it does not exist, stop and
-   tell the user to run `/business-analyst NN`. Do not create it.
+   tell the human to run `/business-analyst NN`. Do not create it.
 2. `docs/brief.md` — constraints and context.
 3. `docs/tasks/NN-*.md` — original requirement.
 4. Search `docs/features/*/*-adr.md` for the same domain and rules. Read the
@@ -54,7 +54,7 @@ rules.
 ### Non-functional requirements
 
 Use `NFR-NN-1`, and so on. Record qualities that must hold, such as precision,
-auditability, authorisation, idempotency, performance, or retention. Make every
+auditability, authorization, idempotency, performance, or retention. Make every
 NFR testable.
 
 ## The four questions
@@ -64,7 +64,7 @@ The analyst states the obligation. Choose the mechanism and state the rule.
 **Money.** State the type, scale, rounding, amount comparison, and database
 column type.
 
-**Authorisation.** State where the check lives — controller, service, or
+**Authorization.** State where the check lives — controller, service, or
 repository — what it throws, its status, and what values are compared.
 
 **Audit.** State what is recorded — actor, action, before, and after — the

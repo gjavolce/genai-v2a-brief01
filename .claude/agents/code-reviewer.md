@@ -39,7 +39,7 @@ Put validation annotations on request objects.
 style, and test structure.
 
 **Errors.** Each failure path returns a suitable status and problem detail. Do
-not swallow exceptions or use `catch (Exception e) { }`.
+not catch an exception and discard it. Do not use `catch (Exception e) { }`.
 
 **Dead code.** Check for unused imports, commented code, TODOs without an owner,
 and abstractions with one implementation.

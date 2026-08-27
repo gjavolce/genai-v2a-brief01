@@ -2,10 +2,14 @@ package com.neueda.capstone.common;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.net.URI;
+
+import jakarta.validation.ConstraintViolationException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -16,6 +20,7 @@ public class GlobalExceptionHandler {
     ProblemDetail handleNotFound(NotFoundException exception) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, exception.getMessage());
         problem.setTitle("Not found");
+        problem.setInstance(URI.create("about:blank"));
         return problem;
     }
 
@@ -34,7 +39,15 @@ public class GlobalExceptionHandler {
 
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "The request is invalid.");
         problem.setTitle("Validation failed");
+        problem.setInstance(URI.create("about:blank"));
         problem.setProperty("errors", errors);
+        return problem;
+    }
+
+    @ExceptionHandler({ConstraintViolationException.class, MethodArgumentTypeMismatchException.class})
+    ProblemDetail handleInvalidParameter(Exception exception) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "The request is invalid.");
+        problem.setTitle("Validation failed");
         return problem;
     }
 }

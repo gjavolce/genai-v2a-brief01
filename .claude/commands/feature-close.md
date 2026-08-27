@@ -12,11 +12,11 @@ Close task `$1` after the review chain passes.
 
 Stop if any condition is false. State the failed condition.
 
-- `./verify.sh` is green.
+- `./verify.sh` passes.
 - `code-reviewer` has no HIGH finding.
 - If the current client has a `security-reviewer`, it has no HIGH finding.
 - If no security reviewer exists, state that no security review ran.
-- Ask the user whether to continue without the security review.
+- Ask the human whether to continue without the security review.
 - Do not treat a missing review as a passing review.
 - The branch is `feature/$1-*`, not `main`.
 - The diff changes database, backend, and frontend.
@@ -29,7 +29,7 @@ Stop if any condition is false. State the failed condition.
   `docs/features/$1/$1-acceptance.md`.
 - Do not modify `api/src/main/**` or `web/src/**`.
 - This is a documentation step.
-- Suggest git commands, but never run `git commit`, `git push`, or `gh pr create`.
+- Suggest git commands. Do not run `git commit`, `git push`, or `gh pr create`.
 
 # Output
 
@@ -51,7 +51,7 @@ Stop if any condition is false. State the failed condition.
    Database · Backend · Frontend — one line each that names files.
 
    ### Testing
-   Map tests to acceptance criteria. Confirm `./verify.sh` is green.
+   Map tests to acceptance criteria. Confirm `./verify.sh` passes.
 
    ### Review findings
    State reviewer findings and their resolution. Use `Clean` when applicable.
@@ -71,7 +71,7 @@ Stop if any condition is false. State the failed condition.
 
 # Verify
 
-- State when `./verify.sh` was green.
+- State when `./verify.sh` passed.
 - Every criterion is ticked or explicitly explained.
 - The PR document names all three layers.
 - `Not included` is complete and accurate.

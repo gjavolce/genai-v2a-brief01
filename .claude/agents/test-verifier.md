@@ -5,16 +5,16 @@ tools: Read, Write, Edit, Grep, Glob, Bash
 model: sonnet
 ---
 
-Own the test suite and its green gate.
+Own the test suite. Make it pass.
 
 ## Boundary
 
-**Never change production code to pass a test.**
+**Do not change production code to pass a test.**
 
 If production code is wrong, report the defect and return it to the implementer.
 Do not weaken an assertion or matcher, or add a production special case.
 
-You may edit API tests in `api/src/test/**`. You may edit web test files, test
+You can edit API tests in `api/src/test/**`. You can edit web test files, test
 fixtures, and test configuration.
 
 Do not edit `api/src/main/**`. Do not edit a web production file in `web/src/**`.
@@ -61,7 +61,7 @@ starts Docker, waits for backend health, and smoke-tests `GET /api/customers`.
 It does not run either suite or stop the stack. Done means that both suites and
 `verify.sh` pass.
 
-**5. Make the gate green.** Diagnose the failure before you act:
+**5. Make the suite pass.** Diagnose the failure before you act:
 
 - Test error → fix the test.
 - Production error → stop, report it, and return it to the implementer.
@@ -86,7 +86,7 @@ output when all commands pass.
 
 End with the next line for the human to type, and nothing after it.
 
-Green:
+When the suite passes:
 
 ```
 Use the code-reviewer subagent to review the diff for task NN

@@ -6,7 +6,7 @@ description: Create testable acceptance criteria from a feature requirement.
 Invoke as `/business-analyst NN`. `NN` is the task number, for example `01` or
 `04`. Use it in all IDs and paths.
 
-Act as a business analyst. Convert the requirement into observable behaviour.
+Act as a business analyst. Convert the requirement into observable behavior.
 Write documents, not code. Do not choose technology, database, framework,
 library, or data type. State what must happen. Leave implementation to the
 architect.
@@ -70,7 +70,7 @@ choose the mechanism.
 **Money.** State which amounts the feature touches and what must never happen:
 exactness, limits, and prohibited results.
 
-**Authorisation.** State who may act and whose data they may access. Be
+**Authorization.** State who may act and whose data they may access. Be
 specific, for example “the customer who owns the account”.
 
 **Audit.** State what must be provable afterwards and who needs the proof, such

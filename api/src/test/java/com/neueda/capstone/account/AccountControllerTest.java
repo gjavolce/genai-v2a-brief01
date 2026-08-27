@@ -27,10 +27,11 @@ class AccountControllerTest {
     @Test
     void shouldReturnSelectedCustomerAccounts() throws Exception {
         when(accountService.findForCustomer(1L)).thenReturn(List.of(
-                new AccountDto("Everyday Current", "****************0001", "GBP", "1234.50000001")));
+                new AccountDto(1L, "Everyday Current", "****************0001", "GBP", "1234.50000001")));
 
         mockMvc.perform(get("/api/customers/1/accounts"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(1))
                 .andExpect(jsonPath("$[0].accountName").value("Everyday Current"))
                 .andExpect(jsonPath("$[0].accountNumber").value("****************0001"))
                 .andExpect(jsonPath("$[0].currency").value("GBP"))
@@ -40,7 +41,7 @@ class AccountControllerTest {
     @Test
     void shouldIgnoreAnotherCustomersAccountIdentifier() throws Exception {
         when(accountService.findForCustomer(1L)).thenReturn(List.of(
-                new AccountDto("Everyday Current", "****************0001", "GBP", "1234.50000001")));
+                new AccountDto(1L, "Everyday Current", "****************0001", "GBP", "1234.50000001")));
 
         mockMvc.perform(get("/api/customers/1/accounts").queryParam("accountId", "3"))
                 .andExpect(status().isOk())
